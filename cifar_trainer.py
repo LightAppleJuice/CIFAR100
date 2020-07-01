@@ -67,7 +67,7 @@ class CifarTrainer:
             loss = self.criterion(output, labels_batch)
 
             if batch_idx % 10 == 0:
-                self.writer.add_scalar('Loss/train', loss.item(), iteration)
+                self.writer.add_scalars('Loss/batch loss', {'loss': loss.item()}, iteration)
                 logger.info('{}_{} Train loss: {}'.format(epoch, batch_idx, loss.item()))
 
             self.optimizer.zero_grad()
@@ -96,7 +96,7 @@ class CifarTrainer:
         total = 0
         mean_loss = 0
 
-        for batch_idx, batch_info in enumerate(test_loader):
+        for _, batch_info in enumerate(test_loader):
             images_batch = batch_info[0]
             labels_batch = batch_info[1]
             images_batch = images_batch.to(self.device).float()
@@ -111,8 +111,8 @@ class CifarTrainer:
 
         acc = correct / total
         mean_loss /= len(test_loader)
-        self.writer.add_scalar('Accuracy/{}'.format(mark), acc, iteration)
-        self.writer.add_scalar('Mean Loss/{}'.format(mark), mean_loss, iteration)
+        self.writer.add_scalars('Accuracy/acc', {mark: acc}, iteration)
+        self.writer.add_scalars('Loss/{Mean loss}', {mark: mean_loss}, iteration)
         logger.info('{}_{} {} loss: {} accuracy: {}'.format(mark, epoch, batch_idx, mean_loss, acc))
 
         if save_model:
