@@ -2,18 +2,13 @@
   "train_params": {
     "batch_size_train": 256,
     "batch_size_test": 16,
-    "num_cuda": 0,
+    "cuda_number": 0,
     "learning_rate": 0.01,
     "learning_rate_step": 3,
     "num_epoch": 15,
     "use_pretrained": false,
-    "model_params": [
-      3,
-      4,
-      6,
-      3
-    ],
-    "optimizer": 'SGD',
+    "model_params": [2, 2, 2, 2],
+    "optimizer": "SGD",
     "num_workers": 4
   }
 }

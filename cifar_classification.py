@@ -18,7 +18,7 @@ from nn.resnet import *
 if __name__ == '__main__':
     root_path = './data'
     out_dir = './results/resnet34'
-    config_name = './configs/resnet.json'
+    config_name = './configs/resnet18.json'
 
     cfg = config_parser.parse_config(config_name)
     params = cfg.train_params

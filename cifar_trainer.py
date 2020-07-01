@@ -96,6 +96,7 @@ class CifarTrainer:
             images_batch = batch_info[0]
             labels_batch = batch_info[1]
             images_batch = images_batch.to(self.device).float()
+            labels_batch = labels_batch.to(self.device)
             output = self.model(images_batch)
             loss = self.criterion(output, labels_batch)
             mean_loss += loss.item()
