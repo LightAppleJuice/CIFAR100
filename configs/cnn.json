@@ -7,10 +7,10 @@
     "learning_rate_step": 3,
     "num_epoch": 15,
     "use_pretrained": false,
-    "model_params": [2, 2, 2, 2],
+    "model_params": [16],
     "optimizer": "SGD",
     "num_workers": 4,
     "loss": "CrossEntropyLoss",
-    "model": "ResNet"
+    "model": "CNN"
   }
 }

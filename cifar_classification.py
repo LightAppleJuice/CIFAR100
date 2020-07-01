@@ -11,14 +11,13 @@ from torch import optim
 from cifar_trainer import CifarTrainer
 from utils import config_parser
 from nn.cnn import *
-from nn.vgg import *
 from nn.resnet import *
 
 
 if __name__ == '__main__':
     root_path = './data'
-    out_dir = './results/resnet34'
-    config_name = './configs/resnet18.json'
+    out_dir = './results'
+    config_name = './configs/cnn.json'
 
     cfg = config_parser.parse_config(config_name)
     params = cfg.train_params
@@ -28,8 +27,7 @@ if __name__ == '__main__':
     now = datetime.datetime.now()
     print(now.strftime("%Y-%m-%d %H:%M:%S"))
 
-    # out_dir = '_'. join([out_dir, now.strftime("%m_%d_%H_%M")])
-    out_dir = '_'.join([out_dir, now.strftime("%m_%d_%H_%M")])
+    out_dir = '_'.join([os.path.join(out_dir, os.path.basename(config_name).split('.')[0]), now.strftime("%m_%d_%H")])
 
     shutil.rmtree(out_dir, ignore_errors=True)
     os.makedirs(out_dir, exist_ok=True)
@@ -75,16 +73,23 @@ if __name__ == '__main__':
     #######################################
     # 2. Model & Trainer initialization
     #######################################
-
-    # model = CNN(n_filters=params['model_params'], n_classes=100)
-    model = ResNet(BasicBlock, params.model_params, num_classes=100)
+    if params.model == "CNN":
+        model = CNN(n_filters=params['model_params'], n_classes=100)
+    elif params.model == "ResNet":
+        model = ResNet(BasicBlock, params.model_params, num_classes=100)
 
     if params.optimizer == 'SGD':
         optimizer = optim.SGD(model.parameters(), lr=params.learning_rate, momentum=0.9)
 
+    loss_function = None
+    if params.loss == 'CrossEntropyLoss':
+        loss_function = nn.CrossEntropyLoss()
+    if params.loss == 'NLLLoss':
+        loss_function = nn.NLLLoss()
+
     device = torch.device("cuda:{}".format(params.cuda_number) if torch.cuda.is_available() else "cpu")
 
-    trainer = CifarTrainer(model=model, optimizer=optimizer, criterion=nn.CrossEntropyLoss(),
+    trainer = CifarTrainer(model=model, optimizer=optimizer, criterion=loss_function,
                            snapshot_dir=os.path.join(out_dir, 'snapshots'),
                            log_dir=out_dir,
                            result_dir=out_dir,

@@ -50,7 +50,13 @@ class CifarTrainer:
             if batch_idx % test_acc_check == 0 and batch_idx > 0:
                 self.test_model(test_loader,
                                 iteration=iteration,
-                                epoch=epoch, batch_idx=batch_idx)
+                                epoch=epoch, batch_idx=batch_idx,
+                                mark='Test')
+            if batch_idx % train_acc_check == 0 and batch_idx > 0:
+                self.test_model(train_loader,
+                                iteration=iteration,
+                                epoch=epoch, batch_idx=batch_idx,
+                                mark='Train')
 
             self.model.train()
 
@@ -60,7 +66,7 @@ class CifarTrainer:
             output = self.model(images_batch)
             loss = self.criterion(output, labels_batch)
 
-            if batch_idx % train_acc_check == 0:
+            if batch_idx % 10 == 0:
                 self.writer.add_scalar('Loss/train', loss.item(), iteration)
                 logger.info('{}_{} Train loss: {}'.format(epoch, batch_idx, loss.item()))
 
@@ -69,7 +75,7 @@ class CifarTrainer:
             self.optimizer.step()
 
 
-    def test_model(self, test_loader, iteration, epoch, batch_idx, save_model=True):
+    def test_model(self, test_loader, iteration, epoch, batch_idx, save_model=True, mark=''):
         """
         Evaluate model
         :param test_loader:
@@ -79,9 +85,7 @@ class CifarTrainer:
         :param save_model:
         :return: accuracy
         """
-        logger.info('Test model')
-        if save_model:
-            torch.save(self.model.state_dict(), '{}/{}_{}.pth'.format(self.snapshot_dir, epoch, batch_idx))
+        logger.info('Accuracy check')
 
         torch.cuda.empty_cache()
         self.model.to(self.device)
@@ -107,8 +111,13 @@ class CifarTrainer:
 
         acc = correct / total
         mean_loss /= len(test_loader)
-        self.writer.add_scalar('Accuracy/test', acc, iteration)
-        logger.info('{}_{} Test loss: {} accuracy: {}'.format(epoch, batch_idx, mean_loss, acc))
+        self.writer.add_scalar('Accuracy/{}'.format(mark), acc, iteration)
+        self.writer.add_scalar('Mean Loss/{}'.format(mark), mean_loss, iteration)
+        logger.info('{}_{} {} loss: {} accuracy: {}'.format(mark, epoch, batch_idx, mean_loss, acc))
+
+        if save_model:
+            logger.info('Model is saved as {}/{}_{}.pth'.format(self.snapshot_dir, epoch, batch_idx))
+            torch.save(self.model.state_dict(), '{}/{}_{}.pth'.format(self.snapshot_dir, epoch, batch_idx))
         return
 
 
