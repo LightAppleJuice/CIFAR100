@@ -4,9 +4,12 @@ import logging
 import datetime
 import random
 import torchvision
+import time
 
 from torch.utils.data import DataLoader
 from torch import optim
+from torchsummary import summary
+
 
 from cifar_trainer import CifarTrainer
 from utils import config_parser
@@ -56,6 +59,8 @@ if __name__ == '__main__':
 
     train_data = torchvision.datasets.CIFAR100(root_path, train=True, download=True,
                                                transform=torchvision.transforms.Compose([
+                                                   torchvision.transforms.RandomCrop(32, padding=4),
+                                                   torchvision.transforms.RandomHorizontalFlip(),
                                                    torchvision.transforms.ToTensor(),
                                                    torchvision.transforms.Normalize(mean=cifar_mean, std=cifar_std)
                                                ]))
@@ -78,8 +83,10 @@ if __name__ == '__main__':
     elif params.model == "ResNet":
         model = ResNet(BasicBlock, params.model_params, num_classes=100)
 
+    summary(model, input_size=(3, 32, 32))
+
     if params.optimizer == 'SGD':
-        optimizer = optim.SGD(model.parameters(), lr=params.learning_rate, momentum=0.9)
+        optimizer = optim.SGD(model.parameters(), lr=params.learning_rate, momentum=0.9, weight_decay=0.0001)
 
     loss_function = None
     if params.loss == 'CrossEntropyLoss':
@@ -88,6 +95,7 @@ if __name__ == '__main__':
         loss_function = nn.NLLLoss()
 
     device = torch.device("cuda:{}".format(params.cuda_number) if torch.cuda.is_available() else "cpu")
+
 
     trainer = CifarTrainer(model=model, optimizer=optimizer, criterion=loss_function,
                            snapshot_dir=os.path.join(out_dir, 'snapshots'),
@@ -98,12 +106,15 @@ if __name__ == '__main__':
     #######################################
     # 3. Training
     #######################################
-
+    tic = time.perf_counter()
     for epoch in range(params.num_epoch):
+        tic = time.perf_counter()
         logger.info('Training epoch {}/{}'.format(epoch, params.num_epoch))
         trainer.train_epoch(train_loader, test_loader, epoch,
                             train_acc_check=100, test_acc_check=100)
         trainer.adjust_learning_rate(epoch, step=params.learning_rate_step, base_lr=params.learning_rate)
+        toc = time.perf_counter()
+        logger.info(f"Finished in {(toc - tic) / ((epoch+1) * 60):0.4f} minutes")
 
 
 
