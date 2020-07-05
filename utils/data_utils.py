@@ -2,6 +2,7 @@ import torchvision
 import torch
 import numpy as np
 from torch.utils.data import DataLoader
+import matplotlib.pyplot as plt
 
 
 def get_mean_std(dataset, big_dataset=True):
@@ -27,6 +28,12 @@ def get_mean_std(dataset, big_dataset=True):
         mean = mean / n  # mean
         std = std / n - (mean ** 2)
         return mean, std.sqrt()
+
+def show_img(img):
+    plt.figure(figsize=(32, 32))
+    plt.imshow(img)
+    plt.show()
+    print('.')
 
 
 if __name__ == '__main__':
