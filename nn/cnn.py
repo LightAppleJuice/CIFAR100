@@ -22,6 +22,7 @@ class CNN(nn.Module):
             nn.Linear(n_classes*2, n_classes),
             # nn.LogSoftmax()
         )
+        self.initialize_weights()
 
     def forward(self, x):
         x = self.cnn_blocks(x)
@@ -39,15 +40,17 @@ class CNN(nn.Module):
         modules = []
         for filters in n_filters:
             modules.append(nn.Conv2d(input_channels, filters, kernel, padding=1))
+            modules.append(nn.BatchNorm2d(filters))
             modules.append(nn.ReLU(inplace=True))
             modules.append(nn.Conv2d(filters, filters, kernel, padding=1))
+            modules.append(nn.BatchNorm2d(filters))
             modules.append(nn.ReLU(inplace=True))
             modules.append(nn.MaxPool2d(2, 2))
             input_channels = filters
 
         return nn.Sequential(*modules)
 
-    def _initialize_weights(self):
+    def initialize_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
