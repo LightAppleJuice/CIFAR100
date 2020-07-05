@@ -10,11 +10,20 @@ from torch.utils.data import DataLoader
 from torch import optim
 from torchsummary import summary
 
+import albumentations as A
+from albumentations import (
+    HorizontalFlip, IAAPerspective, ShiftScaleRotate, CLAHE, RandomRotate90,
+    Transpose, ShiftScaleRotate, Blur, OpticalDistortion, GridDistortion, HueSaturationValue,
+    IAAAdditiveGaussianNoise, GaussNoise, MotionBlur, MedianBlur, RandomBrightnessContrast, IAAPiecewiseAffine,
+    IAASharpen, IAAEmboss, Flip, OneOf, Compose
+)
+
 
 from cifar_trainer import CifarTrainer
 from utils import config_parser
 from nn.cnn import *
 from nn.resnet import *
+from cifar_custom_dataset import CIFAR100
 
 
 if __name__ == '__main__':
@@ -57,13 +66,23 @@ if __name__ == '__main__':
     cifar_mean = torch.tensor([0.5071, 0.4866, 0.4409])
     cifar_std = torch.tensor([0.2673, 0.2564, 0.2761])
 
-    train_data = torchvision.datasets.CIFAR100(root_path, train=True, download=True,
-                                               transform=torchvision.transforms.Compose([
-                                                   torchvision.transforms.RandomCrop(32, padding=4),
-                                                   torchvision.transforms.RandomHorizontalFlip(),
-                                                   torchvision.transforms.ToTensor(),
-                                                   torchvision.transforms.Normalize(mean=cifar_mean, std=cifar_std)
-                                               ]))
+    train_data = CIFAR100(root_path, train=True, download=True,
+                          custom_aug=Compose({A.FancyPCA()}),
+                          transform=torchvision.transforms.Compose([
+                              torchvision.transforms.ToTensor(),
+                              torchvision.transforms.Normalize(mean=cifar_mean, std=cifar_std)
+                          ])
+                          )
+
+    # train_data = torchvision.datasets.CIFAR100(root_path, train=True, download=True,
+    #                                            transform=torchvision.transforms.Compose([
+    #                                                torchvision.transforms.RandomCrop(32, padding=4),
+    #                                                torchvision.transforms.RandomHorizontalFlip(),
+    #                                                # torchvision.transforms.ColorJitter()
+    #                                                torchvision.transforms.RandomRotation(10),
+    #                                                torchvision.transforms.ToTensor(),
+    #                                                torchvision.transforms.Normalize(mean=cifar_mean, std=cifar_std)
+    #                                            ]))
     test_data = torchvision.datasets.CIFAR100(root_path, train=False, download=True,
                                               transform=torchvision.transforms.Compose([
                                                   torchvision.transforms.ToTensor(),
@@ -86,7 +105,9 @@ if __name__ == '__main__':
     summary(model, input_size=(3, 32, 32))
 
     if params.optimizer == 'SGD':
-        optimizer = optim.SGD(model.parameters(), lr=params.learning_rate, momentum=0.9, weight_decay=0.0001)
+        optimizer = optim.SGD(model.parameters(), lr=params.learning_rate, momentum=0.9, weight_decay=5e-4, nesterov=True)
+    if params.optimizer == 'Adam':
+        optimizer = optim.Adam(model.parameters(), lr=params.learning_rate, weight_decay=5e-4)
 
     loss_function = None
     if params.loss == 'CrossEntropyLoss':
