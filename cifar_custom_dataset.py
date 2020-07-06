@@ -42,10 +42,10 @@ class CIFAR100(CIFAR100):
         # doing this so that it is consistent with all other datasets
         # to return a PIL Image
         img = Image.fromarray(img)
-        show_img(img)
+        # show_img(img)
         if self.aug is not None:
             img = self.aug(image=np.array(img))['image']
-            show_img(img)
+            # show_img(img)
 
         if self.transform is not None:
             img = self.transform(img)
