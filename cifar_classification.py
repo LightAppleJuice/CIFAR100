@@ -117,7 +117,6 @@ if __name__ == '__main__':
 
     device = torch.device("cuda:{}".format(params.cuda_number) if torch.cuda.is_available() else "cpu")
 
-
     trainer = CifarTrainer(model=model, optimizer=optimizer, criterion=loss_function,
                            snapshot_dir=os.path.join(out_dir, 'snapshots'),
                            log_dir=out_dir,
