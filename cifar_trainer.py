@@ -34,7 +34,7 @@ class CifarTrainer:
 
         os.makedirs(snapshot_dir, exist_ok=True)
 
-    def train_epoch(self, train_loader, test_loader, epoch, train_acc_check=100, test_acc_check=100):
+    def train_epoch(self, train_loader, test_loader, epoch, train_acc_check=None, test_acc_check=None):
         logger.info('Train epoch')
 
         torch.cuda.empty_cache()
@@ -47,16 +47,18 @@ class CifarTrainer:
             labels_batch = batch_info[1]
             iteration = num_batches * epoch + batch_idx
 
-            if batch_idx % test_acc_check == 0 and batch_idx > 0:
-                self.test_model(test_loader,
-                                iteration=iteration,
-                                epoch=epoch, batch_idx=batch_idx,
-                                mark='Test')
-            if batch_idx % train_acc_check == 0 and batch_idx > 0:
-                self.test_model(train_loader,
-                                iteration=iteration,
-                                epoch=epoch, batch_idx=batch_idx,
-                                mark='Train')
+            if test_acc_check:
+                if batch_idx % test_acc_check == 0 and batch_idx > 0:
+                    self.test_model(test_loader,
+                                    iteration=iteration,
+                                    epoch=epoch, batch_idx=batch_idx,
+                                    mark='Test')
+            if train_acc_check:
+                if batch_idx % train_acc_check == 0 and batch_idx > 0:
+                    self.test_model(train_loader,
+                                    iteration=iteration,
+                                    epoch=epoch, batch_idx=batch_idx,
+                                    mark='Train')
 
             self.model.train()
 
@@ -113,25 +115,9 @@ class CifarTrainer:
         mean_loss /= len(test_loader)
         self.writer.add_scalars('Accuracy/acc', {mark: acc}, iteration)
         self.writer.add_scalars('Loss/{Mean loss}', {mark: mean_loss}, iteration)
-        logger.info('{}_{} {} loss: {} accuracy: {}'.format(mark, epoch, batch_idx, mean_loss, acc))
+        logger.info('{} {}_{} loss: {} accuracy: {}'.format(mark, epoch, batch_idx, mean_loss, acc))
 
         if save_model:
             logger.info('Model is saved as {}/{}_{}.pth'.format(self.snapshot_dir, epoch, batch_idx))
             torch.save(self.model.state_dict(), '{}/{}_{}.pth'.format(self.snapshot_dir, epoch, batch_idx))
-        return
-
-
-    def adjust_learning_rate(self, epoch, step=2, base_lr=1e-3):
-        """
-        Updating learning rate each epoch multiple to step value
-        :param epoch: current epoch
-        :param step:
-        :param base_lr:
-        :return:
-        """
-        lr = base_lr * (0.1 ** (epoch // step))
-
-        for param_group in self.optimizer.param_groups:
-            param_group['lr'] = lr
-
-        logger.info('Learning rate was updated to {}'.format(lr))
+        return acc, mean_loss

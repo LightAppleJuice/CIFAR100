@@ -9,15 +9,9 @@ import time
 from torch.utils.data import DataLoader
 from torch import optim
 from torchsummary import summary
+from torch.optim import lr_scheduler
 
 import albumentations as A
-from albumentations import (
-    HorizontalFlip, IAAPerspective, ShiftScaleRotate, CLAHE, RandomRotate90,
-    Transpose, ShiftScaleRotate, Blur, OpticalDistortion, GridDistortion, HueSaturationValue,
-    IAAAdditiveGaussianNoise, GaussNoise, MotionBlur, MedianBlur, RandomBrightnessContrast, IAAPiecewiseAffine,
-    IAASharpen, IAAEmboss, Flip, OneOf, Compose
-)
-
 
 from cifar_trainer import CifarTrainer
 from utils import config_parser
@@ -67,7 +61,7 @@ if __name__ == '__main__':
     cifar_std = torch.tensor([0.2673, 0.2564, 0.2761])
 
     train_data = CIFAR100(root_path, train=True, download=True,
-                          custom_aug=Compose({A.FancyPCA()}),
+                          custom_aug=A.Compose({A.FancyPCA()}),
                           transform=torchvision.transforms.Compose([
                               torchvision.transforms.ToTensor(),
                               torchvision.transforms.Normalize(mean=cifar_mean, std=cifar_std)
@@ -109,6 +103,11 @@ if __name__ == '__main__':
     if params.optimizer == 'Adam':
         optimizer = optim.Adam(model.parameters(), lr=params.learning_rate, weight_decay=5e-4)
 
+    # scheduler = lr_scheduler.StepLR(optimizer, step_size=params.learning_rate_step, gamma=0.1)
+    # scheduler = lr_scheduler.MultiStepLR(optimizer, [60, 120, 200], gamma=0.1)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=20, verbose=False,
+                                               threshold=0.0001, min_lr=0, eps=1e-08)
+
     loss_function = None
     if params.loss == 'CrossEntropyLoss':
         loss_function = nn.CrossEntropyLoss()
@@ -129,10 +128,19 @@ if __name__ == '__main__':
     tic = time.perf_counter()
     for epoch in range(params.num_epoch):
         tic = time.perf_counter()
+        test_acc, test_mean_loss = trainer.test_model(test_loader,
+                        iteration=epoch,
+                        epoch=epoch, batch_idx=0,
+                        mark='Test')
+
+        train_acc, train_mean_loss = trainer.test_model(train_loader,
+                        iteration=epoch,
+                        epoch=epoch, batch_idx=0,
+                        mark='Train')
         logger.info('Training epoch {}/{}'.format(epoch, params.num_epoch))
         trainer.train_epoch(train_loader, test_loader, epoch,
                             train_acc_check=100, test_acc_check=100)
-        trainer.adjust_learning_rate(epoch, step=params.learning_rate_step, base_lr=params.learning_rate)
+        scheduler.step(test_acc)
         toc = time.perf_counter()
         logger.info(f"Finished in {(toc - tic) / ((epoch+1) * 60):0.4f} minutes")
 
