@@ -23,7 +23,7 @@ from cifar_custom_dataset import CIFAR100
 if __name__ == '__main__':
     root_path = './data'
     out_dir = './results'
-    config_name = './configs/cnn.json'
+    config_name = './configs/cnn_mfm.json'
 
     cfg = config_parser.parse_config(config_name)
     params = cfg.train_params
@@ -33,7 +33,9 @@ if __name__ == '__main__':
     now = datetime.datetime.now()
     print(now.strftime("%Y-%m-%d %H:%M:%S"))
 
-    out_dir = '_'.join([os.path.join(out_dir, os.path.basename(config_name).split('.')[0]), now.strftime("%m_%d_%H")])
+    experiment_name = os.path.basename(config_name).split('.')[0] + '_all'
+    out_dir = '_'.join([os.path.join(out_dir, experiment_name), now.strftime("%m_%d_%H")])
+    print('Find log in '.format())
 
     shutil.rmtree(out_dir, ignore_errors=True)
     os.makedirs(out_dir, exist_ok=True)
@@ -60,24 +62,25 @@ if __name__ == '__main__':
     cifar_mean = torch.tensor([0.5071, 0.4866, 0.4409])
     cifar_std = torch.tensor([0.2673, 0.2564, 0.2761])
 
-    train_data = CIFAR100(root_path, train=True, download=True,
-                          custom_aug=A.Compose({A.FancyPCA()}),
-                          transform=torchvision.transforms.Compose([
-                              torchvision.transforms.ToTensor(),
-                              torchvision.transforms.Normalize(mean=cifar_mean, std=cifar_std)
-                          ])
-                          )
+    # train_data = CIFAR100(root_path, train=True, download=False,
+    #                       custom_aug=A.Compose({A.FancyPCA()}),
+    #                       transform=torchvision.transforms.Compose([
+    #                           torchvision.transforms.ToTensor(),
+    #                           torchvision.transforms.Normalize(mean=cifar_mean, std=cifar_std)
+    #                       ])
+    #                       )
 
-    # train_data = torchvision.datasets.CIFAR100(root_path, train=True, download=True,
-    #                                            transform=torchvision.transforms.Compose([
-    #                                                torchvision.transforms.RandomCrop(32, padding=4),
-    #                                                torchvision.transforms.RandomHorizontalFlip(),
-    #                                                # torchvision.transforms.ColorJitter()
-    #                                                torchvision.transforms.RandomRotation(10),
-    #                                                torchvision.transforms.ToTensor(),
-    #                                                torchvision.transforms.Normalize(mean=cifar_mean, std=cifar_std)
-    #                                            ]))
-    test_data = torchvision.datasets.CIFAR100(root_path, train=False, download=True,
+    train_data = torchvision.datasets.CIFAR100(root_path, train=True, download=True,
+                                               transform=torchvision.transforms.Compose([
+                                                   torchvision.transforms.RandomCrop(32, padding=4),
+                                                   torchvision.transforms.RandomHorizontalFlip(),
+                                                   # torchvision.transforms.ColorJitter()
+                                                   torchvision.transforms.RandomRotation(10),
+                                                   torchvision.transforms.ToTensor(),
+                                                   torchvision.transforms.Normalize(mean=cifar_mean, std=cifar_std)
+                                               ]))
+
+    test_data = torchvision.datasets.CIFAR100(root_path, train=False, download=False,
                                               transform=torchvision.transforms.Compose([
                                                   torchvision.transforms.ToTensor(),
                                                   torchvision.transforms.Normalize(mean=cifar_mean, std=cifar_std)
@@ -92,6 +95,8 @@ if __name__ == '__main__':
     # 2. Model & Trainer initialization
     #######################################
     if params.model == "CNN":
+        model = CNN(n_filters=params['model_params'], n_classes=100, mfm=False)
+    elif params.model == "CNN_mfm":
         model = CNN(n_filters=params['model_params'], n_classes=100)
     elif params.model == "ResNet":
         model = ResNet(BasicBlock, params.model_params, num_classes=100)
@@ -104,9 +109,10 @@ if __name__ == '__main__':
         optimizer = optim.Adam(model.parameters(), lr=params.learning_rate, weight_decay=5e-4)
 
     # scheduler = lr_scheduler.StepLR(optimizer, step_size=params.learning_rate_step, gamma=0.1)
-    # scheduler = lr_scheduler.MultiStepLR(optimizer, [60, 120, 200], gamma=0.1)
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=20, verbose=False,
-                                               threshold=0.0001, min_lr=0, eps=1e-08)
+    scheduler = lr_scheduler.MultiStepLR(optimizer, [80, 120, 200, 250], gamma=0.1)
+    # scheduler = lr_scheduler.MultiStepLR(optimizer, [15, 80, 120, 200], gamma=0.1)
+    # scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=20, verbose=True,
+    #                                            threshold=0.0001, min_lr=0, eps=1e-04)
 
     loss_function = None
     if params.loss == 'CrossEntropyLoss':
@@ -137,10 +143,10 @@ if __name__ == '__main__':
                         iteration=epoch,
                         epoch=epoch, batch_idx=0,
                         mark='Train')
-        logger.info('Training epoch {}/{}'.format(epoch, params.num_epoch))
+        logger.info('Training epoch {}/{}, lr: {}'.format(epoch, params.num_epoch, scheduler.get_lr()))
         trainer.train_epoch(train_loader, test_loader, epoch,
-                            train_acc_check=100, test_acc_check=100)
-        scheduler.step(test_acc)
+                            train_acc_check=None, test_acc_check=None)
+        scheduler.step()
         toc = time.perf_counter()
         logger.info(f"Finished in {(toc - tic) / ((epoch+1) * 60):0.4f} minutes")
 

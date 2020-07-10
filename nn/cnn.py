@@ -1,9 +1,11 @@
 import torch
 import torch.nn as nn
 
+from nn.mfm import MFM
+
 
 class CNN(nn.Module):
-    def __init__(self, n_filters, n_classes=1, input_shape=[32, 32]):
+    def __init__(self, n_filters, n_classes=1, input_shape=[32, 32], mfm=True):
         """
         Simple CNN model used for CIFAR100
         Architecture uses VGG blocks with smaller filter numbers
@@ -12,16 +14,28 @@ class CNN(nn.Module):
         """
         super().__init__()
         kernel = 3
-        self.cnn_blocks = self.prepare_blocks(n_filters, kernel)
+        if mfm:
+            self.cnn_blocks = self.prepare_mfm_blocks(n_filters, kernel)
+        else:
+            self.cnn_blocks = self.prepare_blocks(n_filters, kernel)
         linear_input = n_filters[-1] * input_shape[0] / pow(2, len(n_filters)) * \
                        input_shape[1] / pow(2, len(n_filters))
-        self.classifier = nn.Sequential(
-            nn.Linear(int(linear_input), n_classes*2),
-            nn.ReLU(True),
-            nn.Dropout(),
-            nn.Linear(n_classes*2, n_classes),
-            # nn.LogSoftmax()
-        )
+        if mfm:
+            self.classifier = nn.Sequential(
+                # nn.Linear(int(linear_input), n_classes*2),
+                # nn.ReLU(True),
+                MFM(int(linear_input), n_classes, type='linear'),
+                nn.Dropout(p=0.5),
+                nn.Linear(n_classes, n_classes),
+            )
+        else:
+            self.classifier = nn.Sequential(
+                nn.Linear(int(linear_input), n_classes*2),
+                nn.ReLU(True),
+                nn.Dropout(p=0.5),
+                nn.Linear(n_classes*2, n_classes),
+            )
+
         self.initialize_weights()
 
     def forward(self, x):
@@ -45,6 +59,22 @@ class CNN(nn.Module):
             modules.append(nn.Conv2d(filters, filters, kernel, padding=1))
             modules.append(nn.BatchNorm2d(filters))
             modules.append(nn.ReLU(inplace=True))
+            modules.append(nn.MaxPool2d(2, 2))
+            input_channels = filters
+
+        return nn.Sequential(*modules)
+
+    def prepare_mfm_blocks(self, n_filters, kernel, input_channels=3):
+        """
+        prepare cnn blocks with maf activations, according to input configuration
+        :param n_filters: list of number of filters used in each block
+        :param kernel: kernel used in Conv2D layers
+        :return: sequential of stacked layers
+        """
+        modules = []
+        for filters in n_filters:
+            modules.append(MFM(int(input_channels), filters, type='conv', kernel_size=kernel, padding=1)),
+            modules.append(MFM(filters, filters, type='conv', kernel_size=kernel, padding=1)),
             modules.append(nn.MaxPool2d(2, 2))
             input_channels = filters
 

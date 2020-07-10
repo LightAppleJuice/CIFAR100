@@ -10,6 +10,6 @@
     "optimizer": "SGD",
     "num_workers": 16,
     "loss": "CrossEntropyLoss",
-    "model": "CNN"
+    "model": "CNN_mfm"
   }
 }
