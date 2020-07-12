@@ -24,9 +24,9 @@ class CNN(nn.Module):
             self.classifier = nn.Sequential(
                 # nn.Linear(int(linear_input), n_classes*2),
                 # nn.ReLU(True),
-                MFM(int(linear_input), n_classes, type='linear'),
+                MFM(int(linear_input), n_classes * 2, type='linear'),
                 nn.Dropout(p=0.5),
-                nn.Linear(n_classes, n_classes),
+                nn.Linear(n_classes * 2, n_classes),
             )
         else:
             self.classifier = nn.Sequential(
