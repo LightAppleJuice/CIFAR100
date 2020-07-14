@@ -33,7 +33,7 @@ if __name__ == '__main__':
     now = datetime.datetime.now()
     print(now.strftime("%Y-%m-%d %H:%M:%S"))
 
-    experiment_name = os.path.basename(config_name).split('.')[0] + '_all'
+    experiment_name = os.path.basename(config_name).split('.')[0] + '_all_x2_cycle_clip_grad'
     out_dir = '_'.join([os.path.join(out_dir, experiment_name), now.strftime("%m_%d_%H")])
     print('Find log in '.format())
 
@@ -109,10 +109,17 @@ if __name__ == '__main__':
         optimizer = optim.Adam(model.parameters(), lr=params.learning_rate, weight_decay=5e-4)
 
     # scheduler = lr_scheduler.StepLR(optimizer, step_size=params.learning_rate_step, gamma=0.1)
-    scheduler = lr_scheduler.MultiStepLR(optimizer, [80, 120, 200, 250], gamma=0.1)
-    # scheduler = lr_scheduler.MultiStepLR(optimizer, [15, 80, 120, 200], gamma=0.1)
+    # scheduler = lr_scheduler.MultiStepLR(optimizer, [80, 120, 200, 250], gamma=0.1)
     # scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=20, verbose=True,
     #                                            threshold=0.0001, min_lr=0, eps=1e-04)
+    scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=2e-2,
+                                        steps_per_epoch=len(train_loader),
+                                        div_factor=10, #total_steps=1000,
+                                        final_div_factor=100,
+                                        epochs=params.num_epoch,
+
+                                        )
+    change_lr_during_epoch = True
 
     loss_function = None
     if params.loss == 'CrossEntropyLoss':
@@ -126,7 +133,8 @@ if __name__ == '__main__':
                            snapshot_dir=os.path.join(out_dir, 'snapshots'),
                            log_dir=out_dir,
                            result_dir=out_dir,
-                           device=device)
+                           device=device,
+                           scheduler=scheduler if change_lr_during_epoch else None)
 
     #######################################
     # 3. Training
@@ -146,7 +154,7 @@ if __name__ == '__main__':
         logger.info('Training epoch {}/{}, lr: {}'.format(epoch, params.num_epoch, scheduler.get_lr()))
         trainer.train_epoch(train_loader, test_loader, epoch,
                             train_acc_check=None, test_acc_check=None)
-        scheduler.step()
+        # scheduler.step()
         toc = time.perf_counter()
         logger.info(f"Finished in {(toc - tic) / ((epoch+1) * 60):0.4f} minutes")
 

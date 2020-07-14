@@ -25,7 +25,7 @@ class CNN(nn.Module):
                 # nn.Linear(int(linear_input), n_classes*2),
                 # nn.ReLU(True),
                 MFM(int(linear_input), n_classes * 2, type='linear'),
-                nn.Dropout(p=0.5),
+                nn.Dropout(p=0.7),
                 nn.Linear(n_classes * 2, n_classes),
             )
         else:

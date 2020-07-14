@@ -10,7 +10,7 @@ class CifarTrainer:
     """
     Basic Tainer for cifar 100 task
     """
-    def __init__(self,  model, criterion, optimizer, device, snapshot_dir, log_dir, result_dir):
+    def __init__(self,  model, criterion, optimizer, device, snapshot_dir, log_dir, result_dir, scheduler):
         """
 
         :param model:
@@ -28,6 +28,7 @@ class CifarTrainer:
         self.log_dir = log_dir
         self.result_dir = result_dir
         self.device = device
+        self.scheduler = scheduler
 
         # TensorBoard visualization: needs command tensorboard --logdir path_to_log_dir
         self.writer = SummaryWriter(os.path.join(log_dir, 'tensorboard_dir'))
@@ -74,7 +75,16 @@ class CifarTrainer:
 
             self.optimizer.zero_grad()
             loss.backward()
+
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.25)
             self.optimizer.step()
+
+            curr_lr = self.scheduler.get_lr()[0]
+            self.writer.add_scalars('LR', {'lr': curr_lr}, iteration)
+            if self.scheduler:
+                self.scheduler.step()
+
+
 
 
     def test_model(self, test_loader, iteration, epoch, batch_idx, save_model=True, mark=''):
