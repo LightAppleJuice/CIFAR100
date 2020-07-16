@@ -4,7 +4,7 @@ import shutil
 import random
 import torch
 
-from torch_lr_finder import LRFinder
+from utils.lr_range_tester import LRFinder
 from torch import optim
 
 from cifar_trainer import CifarTrainer
@@ -83,6 +83,8 @@ if __name__ == '__main__':
         optimizer = optim.Adam(model.parameters(), lr=1e-7, weight_decay=5e-4)
 
     lr_finder = LRFinder(model, optimizer, loss_function, device="cuda")
-    lr_finder.range_test(train_loader, end_lr=100, num_iter=100, step_mode="exp")
+    lr_finder.range_test(train_loader, accumulation_steps=100,
+                         val_loader=test_loader, start_lr=1e-3, end_lr=1, num_iter=100,
+                         step_mode="exp", diverge_th=10)
     lr_finder.plot() # to inspect the loss-learning rate graph
     lr_finder.reset() # to reset the model and optimizer to their initial state
