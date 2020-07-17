@@ -268,6 +268,17 @@ class LRFinder(object):
                 "Expected types are `torch.utils.data.DataLoader`"
                 "or child of `TrainDataLoaderIter`.".format(type(train_loader))
             )
+        if val_loader:
+            if isinstance(val_loader, DataLoader):
+                val_iter_upd = TrainDataLoaderIter(val_loader)
+            elif isinstance(val_loader, TrainDataLoaderIter):
+                val_iter_upd = val_loader
+            else:
+                raise ValueError(
+                    "`val_loader` has unsupported type: {}."
+                    "Expected types are `torch.utils.data.DataLoader`"
+                    "or child of `ValDataLoaderIter`.".format(type(val_loader))
+                )
 
         for iteration in tqdm(range(num_iter)):
             # Train on batch and retrieve loss
@@ -279,19 +290,23 @@ class LRFinder(object):
             loss_val = None
 
             if val_loader:
-                if isinstance(val_loader, DataLoader):
-                    val_iter = ValDataLoaderIter(val_loader)
-                elif isinstance(val_loader, ValDataLoaderIter):
-                    val_iter = val_loader
-                else:
-                    raise ValueError(
-                        "`val_loader` has unsupported type: {}."
-                        "Expected types are `torch.utils.data.DataLoader`"
-                        "or child of `ValDataLoaderIter`.".format(type(val_loader))
-                    )
+                # fixed old version with validation on all validation dataset:
+                # if isinstance(val_loader, DataLoader):
+                #     val_iter = ValDataLoaderIter(val_loader)
+                # elif isinstance(val_loader, ValDataLoaderIter):
+                #     val_iter = val_loader
+                # else:
+                #     raise ValueError(
+                #         "`val_loader` has unsupported type: {}."
+                #         "Expected types are `torch.utils.data.DataLoader`"
+                #         "or child of `ValDataLoaderIter`.".format(type(val_loader))
+                #     )
+                # loss_val = self._validate_upd(
+                #     val_iter, non_blocking_transfer=non_blocking_transfer)
 
-                loss_val = self._validate(
-                    val_iter, non_blocking_transfer=non_blocking_transfer
+                # validation with accumulation steps
+                loss_val = self._validate_upd(
+                    val_iter_upd, non_blocking_transfer=non_blocking_transfer, accumulation_steps=10
                 )
 
             # Update the learning rate
@@ -370,7 +385,7 @@ class LRFinder(object):
             else:
                 total_loss += loss
 
-        self.optimizer.step()
+            self.optimizer.step()
 
         return total_loss.item()
 
@@ -413,6 +428,30 @@ class LRFinder(object):
                 running_loss += loss.item() * batch_size
 
         return running_loss / len(val_iter.dataset)
+
+    def _validate_upd(self, val_iter, non_blocking_transfer=True, accumulation_steps=10):
+        # Set model to evaluation mode and disable gradient computation
+        running_loss = 0
+        self.model.eval()
+        with torch.no_grad():
+            for i in range(accumulation_steps):
+                inputs, labels = next(val_iter)
+                # Move data to the correct device
+                inputs, labels = self._move_to_device(
+                    inputs, labels, non_blocking=non_blocking_transfer
+                )
+
+                if isinstance(inputs, tuple) or isinstance(inputs, list):
+                    batch_size = inputs[0].size(0)
+                else:
+                    batch_size = inputs.size(0)
+
+                # Forward pass and loss computation
+                outputs = self.model(inputs)
+                loss = self.criterion(outputs, labels)
+                running_loss += loss.item()
+
+        return running_loss / accumulation_steps
 
     def plot(self, skip_start=10, skip_end=5, log_lr=True, show_lr=None, ax=None):
         """Plots the learning rate range test.
@@ -466,12 +505,11 @@ class LRFinder(object):
 
         # Plot loss as a function of the learning rate
         if losses_val:
-            ax.plot(lrs, losses,'b', losses_val, 'g')
-            ax.legend(['train_loss', 'val_loss'])
-        else:
-            ax.plot(lrs, losses)
-            ax.legend(['train_loss'])
-        ax.plot()
+            ax.plot(lrs, losses_val, c='b', label='validation')
+
+        ax.plot(lrs, losses, c='g', label='train')
+        ax.legend()
+        # ax.plot()
 
         if log_lr:
             ax.set_xscale("log")

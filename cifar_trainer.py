@@ -76,7 +76,7 @@ class CifarTrainer:
             self.optimizer.zero_grad()
             loss.backward()
 
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.25)
+            # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10)
             self.optimizer.step()
 
             curr_lr = self.scheduler.get_lr()[0]

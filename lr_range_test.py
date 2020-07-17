@@ -1,5 +1,6 @@
 import torchvision
 import os
+import matplotlib.pyplot as plt
 import shutil
 import random
 import torch
@@ -24,7 +25,7 @@ if __name__ == '__main__':
 
     manualSeed = 111
 
-    experiment_name = os.path.basename(config_name).split('.')[0] + 'lr_range_test'
+    experiment_name = os.path.basename(config_name).split('.')[0] + '_lr_range_test'
     out_dir = os.path.join(out_dir, experiment_name)
     print('Find log in '.format())
 
@@ -60,9 +61,9 @@ if __name__ == '__main__':
                                               ]))
 
     train_loader = DataLoader(train_data, batch_size=params.batch_size_train, shuffle=True,
-                              num_workers=params.num_workers)
+                              num_workers=1)
     test_loader = DataLoader(test_data, batch_size=params.batch_size_train, shuffle=False,
-                             num_workers=params.num_workers)
+                             num_workers=1)
 
     #######################################
     # 2. Model & Trainer initialization
@@ -74,17 +75,21 @@ if __name__ == '__main__':
     elif params.model == "ResNet":
         model = ResNet(BasicBlock, params.model_params, num_classes=100)
 
-
     loss_function = nn.CrossEntropyLoss()
 
     if params.optimizer == 'SGD':
-        optimizer = optim.SGD(model.parameters(), lr=1e-7, momentum=0.9, weight_decay=5e-4, nesterov=True)
+        optimizer = optim.SGD(model.parameters(), lr=1e-7, momentum=0.9, weight_decay=1e-3, nesterov=True)
     if params.optimizer == 'Adam':
-        optimizer = optim.Adam(model.parameters(), lr=1e-7, weight_decay=5e-4)
+        optimizer = optim.Adam(model.parameters(), lr=1e-7, weight_decay=1e-3)
 
-    lr_finder = LRFinder(model, optimizer, loss_function, device="cuda")
-    lr_finder.range_test(train_loader, accumulation_steps=100,
-                         val_loader=test_loader, start_lr=1e-3, end_lr=1, num_iter=100,
-                         step_mode="exp", diverge_th=10)
-    lr_finder.plot() # to inspect the loss-learning rate graph
+    fig, ax = plt.subplots()
+    lr_finder = LRFinder(model, optimizer, loss_function)
+    lr_finder.range_test(train_loader, accumulation_steps=4,
+                         val_loader=test_loader, start_lr=1e-5,
+                         end_lr=10, num_iter=500,
+                         step_mode="exp", diverge_th=100)
+    ax = lr_finder.plot(ax=ax, skip_start=0, skip_end=3)
+    fig.show()
+    # fig.savefig(os.path.join(out_dir, 'lr_range_test_cnn_mfm_sgd.png'))
     lr_finder.reset() # to reset the model and optimizer to their initial state
+    exit()

@@ -33,7 +33,7 @@ if __name__ == '__main__':
     now = datetime.datetime.now()
     print(now.strftime("%Y-%m-%d %H:%M:%S"))
 
-    experiment_name = os.path.basename(config_name).split('.')[0] + '_all_x2_cycle_clip_grad'
+    experiment_name = os.path.basename(config_name).split('.')[0] + '_mfm_x2_cycle_avg_pool_only'
     out_dir = '_'.join([os.path.join(out_dir, experiment_name), now.strftime("%m_%d_%H")])
     print('Find log in '.format())
 
@@ -112,7 +112,7 @@ if __name__ == '__main__':
     # scheduler = lr_scheduler.MultiStepLR(optimizer, [80, 120, 200, 250], gamma=0.1)
     # scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=20, verbose=True,
     #                                            threshold=0.0001, min_lr=0, eps=1e-04)
-    scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=2e-2,
+    scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=1.5e-2,
                                         steps_per_epoch=len(train_loader),
                                         div_factor=10, #total_steps=1000,
                                         final_div_factor=100,

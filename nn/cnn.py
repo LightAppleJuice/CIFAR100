@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-
+import torch.nn.functional as F
 from nn.mfm import MFM
 
 
@@ -15,32 +15,43 @@ class CNN(nn.Module):
         super().__init__()
         kernel = 3
         if mfm:
-            self.cnn_blocks = self.prepare_mfm_blocks(n_filters, kernel)
+            cnn_blocks = self.prepare_mfm_blocks(n_filters, kernel)
         else:
-            self.cnn_blocks = self.prepare_blocks(n_filters, kernel)
+            cnn_blocks = self.prepare_blocks(n_filters, kernel)
+
+        modules = []
+        for i in range(len(cnn_blocks) - 1):
+            modules.extend(cnn_blocks[i])
+            # modules.append(nn.MaxPool2d(2, 2))
+            modules.append(nn.AvgPool2d(2, 2))
+        modules.extend(cnn_blocks[-1])
+
+        self.cnn_layers = nn.Sequential(*modules)
+        # last cnn pooling
+        self.cnn_pool = nn.AvgPool2d(2, 2)
+        # self.cnn_pool = nn.MaxPool2d(2, 2)
+
         linear_input = n_filters[-1] * input_shape[0] / pow(2, len(n_filters)) * \
                        input_shape[1] / pow(2, len(n_filters))
         if mfm:
-            self.classifier = nn.Sequential(
-                # nn.Linear(int(linear_input), n_classes*2),
-                # nn.ReLU(True),
-                MFM(int(linear_input), n_classes * 2, type='linear'),
-                nn.Dropout(p=0.7),
-                nn.Linear(n_classes * 2, n_classes),
-            )
+            self.fc = MFM(int(linear_input), n_classes * 2, type='linear')
+            self.dropout = nn.Dropout(p=0.7)
         else:
-            self.classifier = nn.Sequential(
+            self.fc = nn.Sequential(
                 nn.Linear(int(linear_input), n_classes*2),
-                nn.ReLU(True),
-                nn.Dropout(p=0.5),
-                nn.Linear(n_classes*2, n_classes),
-            )
+                nn.ReLU(True))
+            self.dropout = nn.Dropout(p=0.5)
+        self.classifier = nn.Linear(n_classes * 2, n_classes)
 
         self.initialize_weights()
 
     def forward(self, x):
-        x = self.cnn_blocks(x)
+        x = self.cnn_layers(x)
+        x = self.cnn_pool(x)
+        # x = F.max_pool2d(x, 2) + F.avg_pool2d(x, 2)
         x = torch.flatten(x, 1)
+        x = self.fc(x)
+        x = self.dropout(x)
         x = self.classifier(x)
         return x
 
@@ -49,20 +60,21 @@ class CNN(nn.Module):
         prepare cnn blocks (similar to vgg), according to input configuration
         :param n_filters: list of number of filters used in each block
         :param kernel: kernel used in Conv2D layers
-        :return: sequential of stacked layers
+        :return: list of blocks with sequentials of stacked layers without pooling layesr
         """
-        modules = []
+        blocks = []
         for filters in n_filters:
+            modules = []
             modules.append(nn.Conv2d(input_channels, filters, kernel, padding=1))
             modules.append(nn.BatchNorm2d(filters))
             modules.append(nn.ReLU(inplace=True))
             modules.append(nn.Conv2d(filters, filters, kernel, padding=1))
             modules.append(nn.BatchNorm2d(filters))
             modules.append(nn.ReLU(inplace=True))
-            modules.append(nn.MaxPool2d(2, 2))
             input_channels = filters
+            blocks.append(modules)
 
-        return nn.Sequential(*modules)
+        return blocks
 
     def prepare_mfm_blocks(self, n_filters, kernel, input_channels=3):
         """
@@ -71,14 +83,14 @@ class CNN(nn.Module):
         :param kernel: kernel used in Conv2D layers
         :return: sequential of stacked layers
         """
-        modules = []
+        blocks = []
         for filters in n_filters:
+            modules = []
             modules.append(MFM(int(input_channels), filters, type='conv', kernel_size=kernel, padding=1)),
             modules.append(MFM(filters, filters, type='conv', kernel_size=kernel, padding=1)),
-            modules.append(nn.MaxPool2d(2, 2))
             input_channels = filters
-
-        return nn.Sequential(*modules)
+            blocks.append(modules)
+        return blocks
 
     def initialize_weights(self):
         for m in self.modules():
