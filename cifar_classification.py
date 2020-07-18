@@ -18,6 +18,7 @@ import albumentations as A
 from cifar_trainer import CifarTrainer
 from utils import config_parser
 from nn.cnn import *
+from nn.cnn_margin_softmax import *
 from nn.resnet import *
 from utils.lr_range_tester import LRFinder
 
@@ -56,7 +57,7 @@ if __name__ == '__main__':
     now = datetime.datetime.now()
     print(now.strftime("%Y-%m-%d %H:%M:%S"))
 
-    experiment_name = os.path.basename(config_name).split('.')[0] + '_lsoftmax'
+    experiment_name = os.path.basename(config_name).split('.')[0] + 'test'
     out_dir = '_'.join([os.path.join(out_dir, experiment_name), now.strftime("%m_%d_%H")])
     print('Find log in '.format())
 
@@ -120,17 +121,14 @@ if __name__ == '__main__':
 
     device = torch.device("cuda:{}".format(params.cuda_number) if torch.cuda.is_available() else "cpu")
 
-    softmax = 'softmax'
-    if params.loss == 'LsoftmaxLoss':
-        softmax = 'lsoftmax'
-
     if params.model == "CNN":
-        model = CNN(n_filters=params['model_params'], n_classes=100, mfm=False, softmax=softmax,
-                    norm_embds=False, device=device)
+        model = CNN(n_filters=params['model_params'], n_classes=100, mfm=False, norm_embds=params.norm_embds)
     elif params.model == "CNN_mfm":
-        model = CNN(n_filters=params['model_params'], n_classes=100, softmax=softmax, norm_embds=False, device=device)
+        model = CNN(n_filters=params['model_params'], n_classes=100, norm_embds=params.norm_embds)
+    elif params.model == "CNN_mfm_lsoftmax":
+        model = MarginSoftmaxCNN(n_filters=params['model_params'], n_classes=100)
     elif params.model == "ResNet":
-        model = ResNet(BasicBlock, params.model_params, num_classes=100, softmax=softmax, device=device)
+        model = ResNet(BasicBlock, params.model_params, num_classes=100)
     else:
         raise Exception('Unknown architecture. Use one of CNN, CNN_mfm, ResNet')
 
@@ -148,7 +146,7 @@ if __name__ == '__main__':
                               nesterov=True)
 
     loss_function = None
-    if params.loss == 'CrossEntropyLoss' or params.loss == 'LsoftmaxLoss' or params.loss == 'SoftmaxLoss':
+    if params.loss == 'CrossEntropyLoss':
         loss_function = nn.CrossEntropyLoss()
     elif params.loss == 'NLLLoss':
         loss_function = nn.NLLLoss()

@@ -2,13 +2,13 @@ import torchvision
 import os
 import matplotlib.pyplot as plt
 import shutil
+import numpy as np
 import random
 import torch
 
 from utils.lr_range_tester import LRFinder
 from torch import optim
 
-from cifar_trainer import CifarTrainer
 from torch.utils.data import DataLoader
 from nn.cnn import *
 from nn.resnet import *
@@ -86,9 +86,11 @@ if __name__ == '__main__':
     lr_finder = LRFinder(model, optimizer, loss_function)
     lr_finder.range_test(train_loader, accumulation_steps=4,
                          val_loader=test_loader, start_lr=1e-5,
-                         end_lr=10, num_iter=500,
+                         end_lr=10, num_iter=100,
                          step_mode="exp", diverge_th=100)
-    ax = lr_finder.plot(ax=ax, skip_start=0, skip_end=3)
+    a = lr_finder.history['loss_train']
+    b = min([i for i, d in enumerate(a) if d >= 1e+20 or np.isnan(d)])
+    ax = lr_finder.plot(ax=ax, skip_start=0, skip_end=b)
     fig.show()
     # fig.savefig(os.path.join(out_dir, 'lr_range_test_cnn_mfm_sgd.png'))
     lr_finder.reset() # to reset the model and optimizer to their initial state
