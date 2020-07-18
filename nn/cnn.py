@@ -5,7 +5,7 @@ from nn.mfm import MFM
 
 
 class CNN(nn.Module):
-    def __init__(self, n_filters, n_classes=1, input_shape=[32, 32], mfm=True):
+    def __init__(self, n_filters, n_classes=1, input_shape=[32, 32], mfm=True, norm_embds=True):
         """
         Simple CNN model used for CIFAR100
         Architecture uses VGG blocks with smaller filter numbers
@@ -13,6 +13,7 @@ class CNN(nn.Module):
         :param n_classes:
         """
         super().__init__()
+        self.norm_embds = norm_embds
         kernel = 3
         if mfm:
             cnn_blocks = self.prepare_mfm_blocks(n_filters, kernel)
@@ -48,10 +49,15 @@ class CNN(nn.Module):
     def forward(self, x):
         x = self.cnn_layers(x)
         x = self.cnn_pool(x)
-        # x = F.max_pool2d(x, 2) + F.avg_pool2d(x, 2)
-        x = torch.flatten(x, 1)
-        x = self.fc(x)
-        x = self.dropout(x)
+        if self.norm_embds:
+            x = self.dropout(x)
+            x = torch.flatten(x, 1)
+            x = self.fc(x)
+            x = F.normalize(x, p=2, dim=1)
+        else:
+            x = torch.flatten(x, 1)
+            x = self.fc(x)
+            x = self.dropout(x)
         x = self.classifier(x)
         return x
 
