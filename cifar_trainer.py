@@ -66,7 +66,9 @@ class CifarTrainer:
             images_batch = images_batch.to(self.device).float()
             labels_batch = labels_batch.to(self.device)
 
-            output = self.model(images_batch)
+            # output = self.model(images_batch)
+            # for lsoftmax
+            output = self.model(images_batch, labels_batch)
             loss = self.criterion(output, labels_batch)
 
             if batch_idx % 10 == 0:

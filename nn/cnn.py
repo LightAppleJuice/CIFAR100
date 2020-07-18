@@ -2,10 +2,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from nn.mfm import MFM
+from nn.lsoftmax import LSoftmaxLinear
 
 
 class CNN(nn.Module):
-    def __init__(self, n_filters, n_classes=1, input_shape=[32, 32], mfm=True, norm_embds=True):
+    def __init__(self, n_filters, n_classes=1, input_shape=[32, 32], mfm=True, norm_embds=True, softmax='softmax',
+                 device=None):
         """
         Simple CNN model used for CIFAR100
         Architecture uses VGG blocks with smaller filter numbers
@@ -42,15 +44,21 @@ class CNN(nn.Module):
                 nn.Linear(int(linear_input), n_classes*2),
                 nn.ReLU(True))
             self.dropout = nn.Dropout(p=0.5)
-        self.classifier = nn.Linear(n_classes * 2, n_classes)
+
+        if softmax == 'softmax':
+            self.classifier = nn.Linear(n_classes * 2, n_classes)
+        elif softmax == 'lsoftmax':
+            margin = 2
+            self.classifier = LSoftmaxLinear(
+                input_features=n_classes * 2, output_features=n_classes, margin=margin, device=device)
 
         self.initialize_weights()
 
-    def forward(self, x):
+    def forward(self, x, target=None):
         x = self.cnn_layers(x)
         x = self.cnn_pool(x)
         if self.norm_embds:
-            x = self.dropout(x)
+            # x = self.dropout(x)
             x = torch.flatten(x, 1)
             x = self.fc(x)
             x = F.normalize(x, p=2, dim=1)
@@ -58,7 +66,8 @@ class CNN(nn.Module):
             x = torch.flatten(x, 1)
             x = self.fc(x)
             x = self.dropout(x)
-        x = self.classifier(x)
+
+        x = self.classifier(x, target=target)
         return x
 
     def prepare_blocks(self, n_filters, kernel, input_channels=3):
@@ -110,3 +119,6 @@ class CNN(nn.Module):
             elif isinstance(m, nn.Linear):
                 nn.init.normal_(m.weight, 0, 0.01)
                 nn.init.constant_(m.bias, 0)
+            elif isinstance(m, LSoftmaxLinear):
+                m.reset_parameters()
+
