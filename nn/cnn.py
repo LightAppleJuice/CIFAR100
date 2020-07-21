@@ -6,7 +6,7 @@ from nn.lsoftmax import LSoftmaxLinear
 
 
 class CNN(nn.Module):
-    def __init__(self, n_filters, n_classes=1, input_shape=[32, 32], mfm=True, norm_embds=True):
+    def __init__(self, n_filters, n_classes=1, input_shape=[32, 32], mfm=True, norm_embds=True, s=2):
         """
         Simple CNN model used for CIFAR100
         Architecture uses VGG blocks with smaller filter numbers
@@ -15,6 +15,7 @@ class CNN(nn.Module):
         """
         super().__init__()
         self.norm_embds = norm_embds
+        self.s = s
         kernel = 3
         if mfm:
             cnn_blocks = self.prepare_mfm_blocks(n_filters, kernel)
@@ -51,16 +52,16 @@ class CNN(nn.Module):
         x = self.cnn_layers(x)
         x = self.cnn_pool(x)
         if self.norm_embds:
-            # x = self.dropout(x)
+            x = self.dropout(x)
             x = torch.flatten(x, 1)
             x = self.fc(x)
-            x = F.normalize(x, p=2, dim=1)
+            x = F.normalize(x, p=2, dim=1) * self.s
         else:
             x = torch.flatten(x, 1)
             x = self.fc(x)
             x = self.dropout(x)
 
-        x = self.classifier(x, target=target)
+        x = self.classifier(x)
         return x
 
     def prepare_blocks(self, n_filters, kernel, input_channels=3):

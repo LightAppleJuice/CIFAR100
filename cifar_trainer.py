@@ -2,6 +2,7 @@ import torch
 import os
 import logging
 from torch.utils.tensorboard import SummaryWriter
+from utils import data_utils
 
 logger = logging.getLogger("CIFAR.Trainer")
 
@@ -10,7 +11,8 @@ class CifarTrainer:
     """
     Basic Tainer for cifar 100 task
     """
-    def __init__(self,  model, criterion, optimizer, device, snapshot_dir, log_dir, result_dir, scheduler):
+    def __init__(self,  model, criterion, optimizer, device, snapshot_dir, log_dir, result_dir, scheduler,
+                 change_lr_during_epoch):
         """
 
         :param model:
@@ -29,6 +31,7 @@ class CifarTrainer:
         self.result_dir = result_dir
         self.device = device
         self.scheduler = scheduler
+        self.change_lr_during_epoch = change_lr_during_epoch
 
         # TensorBoard visualization: needs command tensorboard --logdir path_to_log_dir
         self.writer = SummaryWriter(os.path.join(log_dir, 'tensorboard_dir'))
@@ -46,6 +49,7 @@ class CifarTrainer:
         for batch_idx, batch_info in enumerate(train_loader):
             images_batch = batch_info[0]
             labels_batch = batch_info[1]
+
             iteration = num_batches * epoch + batch_idx
 
             if test_acc_check:
@@ -81,13 +85,67 @@ class CifarTrainer:
             # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10)
             self.optimizer.step()
 
-            curr_lr = self.scheduler.get_lr()[0]
-            self.writer.add_scalars('LR', {'lr': curr_lr}, iteration)
-            if self.scheduler:
-                self.scheduler.step()
+            if self.change_lr_during_epoch:
+                curr_lr = self.scheduler.get_lr()[0]
+                self.writer.add_scalars('LR', {'lr': curr_lr}, iteration)
+                if self.scheduler:
+                    self.scheduler.step()
 
+    def train_mixup_epoch(self, train_loader, test_loader, epoch, train_acc_check=None, test_acc_check=None):
+        logger.info('Train epoch')
 
+        torch.cuda.empty_cache()
+        self.model.to(self.device)
 
+        num_batches = len(train_loader)
+
+        for batch_idx, batch_info in enumerate(train_loader):
+            images_batch = batch_info[0]
+            labels_batch = batch_info[1]
+
+            images_batch, labels_a, labels_b, lam = data_utils.mixup_data(images_batch, labels_batch, 1)
+
+            iteration = num_batches * epoch + batch_idx
+
+            if test_acc_check:
+                if batch_idx % test_acc_check == 0 and batch_idx > 0:
+                    self.test_model(test_loader,
+                                    iteration=iteration,
+                                    epoch=epoch, batch_idx=batch_idx,
+                                    mark='Test')
+            if train_acc_check:
+                if batch_idx % train_acc_check == 0 and batch_idx > 0:
+                    self.test_model(train_loader,
+                                    iteration=iteration,
+                                    epoch=epoch, batch_idx=batch_idx,
+                                    mark='Train')
+
+            self.model.train()
+
+            images_batch = images_batch.to(self.device).float()
+
+            labels_a = labels_a.to(self.device)
+            labels_b = labels_b.to(self.device)
+
+            output = self.model(images_batch)
+
+            loss = lam * self.criterion(output, labels_a) + (1 - lam) * self.criterion(output, labels_b)
+
+            if batch_idx % 10 == 0:
+                self.writer.add_scalars('Loss/batch loss', {'loss': loss.item()}, iteration)
+                logger.info('{}_{} Train loss: {}'.format(epoch, batch_idx, loss.item()))
+
+            self.optimizer.zero_grad()
+            loss.backward()
+
+            # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10)
+            self.optimizer.step()
+
+            if self.change_lr_during_epoch:
+                curr_lr = self.scheduler.get_lr()[0]
+                self.writer.add_scalars('LR', {'lr': curr_lr}, iteration)
+                if self.scheduler:
+                    self.scheduler.step()
 
     def test_model(self, test_loader, iteration, epoch, batch_idx, save_model=True, mark=''):
         """

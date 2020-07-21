@@ -361,7 +361,7 @@ class LRFinder(object):
             )
 
             # Forward pass
-            outputs = self.model(inputs)
+            outputs = self.model(inputs, target=labels)
             loss = self.criterion(outputs, labels)
 
             # Loss should be averaged in each step

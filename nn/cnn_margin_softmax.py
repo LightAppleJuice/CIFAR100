@@ -6,8 +6,7 @@ from nn.lsoftmax import LSoftmaxLinear
 
 
 class MarginSoftmaxCNN(nn.Module):
-    def __init__(self, n_filters, n_classes=1, input_shape=[32, 32], mfm=True, softmax='lsoftmax',
-                 device=None):
+    def __init__(self, n_filters, n_classes=1, input_shape=[32, 32], mfm=True, softmax='lsoftmax', margin=2):
         """
         Simple CNN model used for CIFAR100 with margin softmax
         Architecture uses VGG blocks with smaller filter numbers
@@ -38,7 +37,7 @@ class MarginSoftmaxCNN(nn.Module):
                        input_shape[1] / pow(2, len(n_filters))
         if mfm:
             self.fc = MFM(int(linear_input), n_classes * 2, type='linear')
-            self.dropout = nn.Dropout(p=0.7)
+            self.dropout = nn.Dropout(p=0.2)
         else:
             self.fc = nn.Sequential(
                 nn.Linear(int(linear_input), n_classes*2),
@@ -46,9 +45,8 @@ class MarginSoftmaxCNN(nn.Module):
             self.dropout = nn.Dropout(p=0.5)
 
         if softmax == 'lsoftmax':
-            margin = 2
             self.classifier = LSoftmaxLinear(
-                input_features=n_classes * 2, output_features=n_classes, margin=margin, device=device)
+                input_features=n_classes * 2, output_features=n_classes, margin=margin)
 
         self.initialize_weights()
 
@@ -57,7 +55,7 @@ class MarginSoftmaxCNN(nn.Module):
         x = self.cnn_pool(x)
         x = torch.flatten(x, 1)
         x = self.fc(x)
-        # x = self.dropout(x)
+        x = self.dropout(x)
 
         x = self.classifier(x, target=target)
         return x

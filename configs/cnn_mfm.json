@@ -13,6 +13,9 @@
     "model": "CNN_mfm",
     "norm_embds": false,
     "lr_scheduler": "OneCycleLR",
-    "do_mixup": true
+    "max_lr" : 3e-2,
+    "div_factor": 10,
+    "final_div_factor": 100,
+    "do_mixup": false
   }
 }

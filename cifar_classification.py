@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import albumentations as A
 
 from cifar_trainer import CifarTrainer
-from utils import config_parser
+from utils import config_parser, model_utils
 from nn.cnn import *
 from nn.cnn_margin_softmax import *
 from nn.resnet import *
@@ -25,20 +25,26 @@ from utils.lr_range_tester import LRFinder
 from cifar_custom_dataset import CIFAR100
 
 def lr_range_test():
-    fig, ax = plt.subplots()
+    logger.info('LR_learning test')
+
     lr_finder = LRFinder(model, optimizer, loss_function)
-    lr_finder.range_test(train_loader, accumulation_steps=2,
-                         val_loader=test_loader, start_lr=1e-5,
-                         end_lr=10, num_iter=1000,
+    lr_finder.range_test(train_loader, accumulation_steps=1,
+                         val_loader=test_loader, start_lr=1e-6,
+                         end_lr=10, num_iter=500,
                          step_mode="exp", diverge_th=100)
     a = lr_finder.history['loss_train']
     arr = [len(a)]
     arr.extend([i for i, d in enumerate(a) if d >= 7 or np.isnan(d)])
     arr.extend([i for i, d in enumerate(lr_finder.history["loss_val"]) if d >= 7 or np.isnan(d)])
     b = min(arr)
+    fig, ax = plt.subplots()
     ax = lr_finder.plot(ax=ax, skip_start=0, skip_end=len(a)-b)
     # fig.show()
-    fig.savefig(os.path.join(out_dir, 'lr_range_test_cnn_mfm_sgd.png'))
+    fig.savefig(os.path.join(out_dir, 'lr_range_test.png'))
+
+    fig, ax = plt.subplots()
+    ax = lr_finder.plot(ax=ax, skip_start=0, skip_end=len(a) - b, log_lr=False)
+    fig.savefig(os.path.join(out_dir, 'lr_range_test_linear.png'))
     lr_finder.reset()
 
 
@@ -46,6 +52,8 @@ if __name__ == '__main__':
     root_path = './data'
     out_dir = './results'
     config_name = './configs/cnn_mfm.json'
+    # config_name = './configs/cnn_mfm_norm_embds.json'
+
     run_lr_range_test = False
     run_training = True
 
@@ -53,13 +61,14 @@ if __name__ == '__main__':
     params = cfg.train_params
 
     manualSeed = 111
+    # manualSeed=None
 
     now = datetime.datetime.now()
     print(now.strftime("%Y-%m-%d %H:%M:%S"))
 
-    experiment_name = os.path.basename(config_name).split('.')[0] + 'test'
+    experiment_name = os.path.basename(config_name).split('.')[0] + '_last'
     out_dir = '_'.join([os.path.join(out_dir, experiment_name), now.strftime("%m_%d_%H")])
-    print('Find log in '.format())
+    print('Find log in {}'.format(out_dir))
 
     shutil.rmtree(out_dir, ignore_errors=True)
     os.makedirs(out_dir, exist_ok=True)
@@ -67,10 +76,16 @@ if __name__ == '__main__':
     logger = logging.getLogger("CIFAR")
     logger.setLevel(logging.INFO)
 
-    fh = logging.FileHandler(os.path.join(out_dir, 'training.log'))
+    # logging to file
+    fileHandler = logging.FileHandler(os.path.join(out_dir, 'training.log'))
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    fh.setFormatter(formatter)
-    logger.addHandler(fh)
+    fileHandler.setFormatter(formatter)
+    logger.addHandler(fileHandler)
+
+    # logging to stdout
+    consoleHandler = logging.StreamHandler()
+    consoleHandler.setFormatter(formatter)
+    logger.addHandler(consoleHandler)
 
     logger.info("Initialization")
 
@@ -123,17 +138,19 @@ if __name__ == '__main__':
 
     if params.model == "CNN":
         model = CNN(n_filters=params['model_params'], n_classes=100, mfm=False, norm_embds=params.norm_embds)
+    elif params.model == "CNN_lsoftmax":
+        model = MarginSoftmaxCNN(n_filters=params['model_params'], n_classes=100, margin=params.margin, mfm=False)
     elif params.model == "CNN_mfm":
         model = CNN(n_filters=params['model_params'], n_classes=100, norm_embds=params.norm_embds)
     elif params.model == "CNN_mfm_lsoftmax":
-        model = MarginSoftmaxCNN(n_filters=params['model_params'], n_classes=100)
+        model = MarginSoftmaxCNN(n_filters=params['model_params'], n_classes=100, margin=params.margin)
     elif params.model == "ResNet":
         model = ResNet(BasicBlock, params.model_params, num_classes=100)
     else:
         raise Exception('Unknown architecture. Use one of CNN, CNN_mfm, ResNet')
 
     model.eval()
-    summary(model, input_size=(3, 32, 32))
+    # summary(model, input_size=(3, 32, 32))
 
     if params.optimizer == 'Adam':
         optimizer = optim.Adam(model.parameters(), lr=params.learning_rate, weight_decay=5e-4)
@@ -162,27 +179,29 @@ if __name__ == '__main__':
     # 4. Training
     #######################################
     if run_training:
+        if params.use_pretrained and os.path.exists(params.use_pretrained):
+            model_utils.load_model(model, params.use_pretrained)
+        else:
+            logger.info('No pretrained model was found.')
+
+        change_lr_during_epoch = False
         if params.lr_scheduler == 'StepLR':
             scheduler = lr_scheduler.StepLR(optimizer, step_size=params.learning_rate_step, gamma=0.1)
         elif params.lr_scheduler == 'MultiStepLR':
-            scheduler = lr_scheduler.MultiStepLR(optimizer, [80, 120, 200, 250], gamma=0.1)
+            scheduler = lr_scheduler.MultiStepLR(optimizer, [50, 100], gamma=0.1)
         elif params.lr_scheduler == 'ReduceLROnPlateau':
             scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=20, verbose=True,
                                                        threshold=0.0001, min_lr=0, eps=1e-04)
         elif params.lr_scheduler == 'OneCycleLR':
             change_lr_during_epoch = True
-            # scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=1.5e-2,
-            #                                     steps_per_epoch=len(train_loader),
-            #                                     div_factor=10,
-            #                                     final_div_factor=100,
-            #                                     epochs=params.num_epoch,
-            #                                     )
-
-            scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=3e-1,
+            scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=params.max_lr,
                                                 steps_per_epoch=len(train_loader),
-                                                div_factor=10,
-                                                final_div_factor=1000,
-                                                epochs=params.num_epoch)
+                                                div_factor=params.div_factor,
+                                                final_div_factor=params.final_div_factor,
+                                                epochs=params.num_epoch,
+                                                # anneal_strategy='linear'
+                                                )
+
         else:
             raise Exception('Unknown type of lr scheduler')
 
@@ -191,7 +210,8 @@ if __name__ == '__main__':
                                log_dir=out_dir,
                                result_dir=out_dir,
                                device=device,
-                               scheduler=scheduler if change_lr_during_epoch else None)
+                               scheduler=scheduler,
+                               change_lr_during_epoch=change_lr_during_epoch)
 
         tic = time.perf_counter()
         for epoch in range(params.num_epoch):
@@ -206,12 +226,19 @@ if __name__ == '__main__':
                                                             epoch=epoch, batch_idx=0,
                                                             mark='Train')
             logger.info('Training epoch {}/{}, lr: {}'.format(epoch, params.num_epoch, scheduler.get_lr()))
-            trainer.train_epoch(train_loader, test_loader, epoch,
-                                train_acc_check=None, test_acc_check=None)
+
+            if params.do_mixup:
+                trainer.train_mixup_epoch(train_loader, test_loader, epoch,
+                                    train_acc_check=None, test_acc_check=None)
+            else:
+                trainer.train_epoch(train_loader, test_loader, epoch,
+                                    train_acc_check=None, test_acc_check=None)
             if not change_lr_during_epoch:
                 scheduler.step()
             toc = time.perf_counter()
             logger.info(f"Finished in {(toc - tic) / ((epoch+1) * 60):0.4f} minutes")
+
+
 
 
 
