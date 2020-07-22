@@ -53,7 +53,7 @@ if __name__ == '__main__':
     out_dir = './results'
     # config_name = './configs/cnn_mfm.json'
     # config_name = './configs/resnet_wide.json'
-    config_name = './configs/resnet18.json'
+    # config_name = './configs/resnet18.json'
     config_name = './configs/resnet18_pretrained.json'
     # config_name = './configs/cnn_mfm_norm_embds.json'
 
@@ -154,13 +154,23 @@ if __name__ == '__main__':
     else:
         raise Exception('Unknown architecture. Use one of CNN, CNN_mfm, ResNet')
 
+    if run_training:
+        if params.use_pretrained and os.path.exists(params.use_pretrained):
+            model_utils.load_model(model, params.use_pretrained)
+        elif params.use_pretrained and params.use_pretrained == "url":
+            resnet18 = torchvision.models.resnet18(pretrained=True)
+            model_utils.load_state_dict(model, resnet18.state_dict())
+            model.freeze_layers()
+        else:
+            logger.info('No pretrained model was found.')
+
     model.eval()
     # summary(model, input_size=(3, 32, 32))
 
     if params.optimizer == 'Adam':
-        optimizer = optim.Adam(model.parameters(), lr=params.learning_rate, weight_decay=5e-4)
+        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=params.learning_rate, weight_decay=5e-4)
     elif params.optimizer == 'SGD':
-        optimizer = optim.SGD(model.parameters(), lr=params.learning_rate, momentum=0.9, weight_decay=5e-4,
+        optimizer = optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=params.learning_rate, momentum=0.9, weight_decay=5e-4,
                               nesterov=True)
     else:
         print('Unknown optimizer. SGD is used instead')
@@ -184,13 +194,6 @@ if __name__ == '__main__':
     # 4. Training
     #######################################
     if run_training:
-        if params.use_pretrained and os.path.exists(params.use_pretrained):
-            model_utils.load_model(model, params.use_pretrained)
-        elif params.use_pretrained and params.use_pretrained == "url":
-            model = torch.hub.load('pytorch/vision:v0.6.0', 'resnet18', pretrained=True)
-        else:
-            logger.info('No pretrained model was found.')
-
         change_lr_during_epoch = False
         if params.lr_scheduler == 'StepLR':
             scheduler = lr_scheduler.StepLR(optimizer, step_size=params.learning_rate_step, gamma=0.1)
@@ -212,6 +215,7 @@ if __name__ == '__main__':
         else:
             raise Exception('Unknown type of lr scheduler')
 
+
         trainer = CifarTrainer(model=model, optimizer=optimizer, criterion=loss_function,
                                snapshot_dir=os.path.join(out_dir, 'snapshots'),
                                log_dir=out_dir,
@@ -222,6 +226,10 @@ if __name__ == '__main__':
 
         tic = time.perf_counter()
         for epoch in range(params.num_epoch):
+            if epoch == 20:
+                parameters = trainer.model.unfreeze()
+                optimizer.add_param_group({'params': parameters})
+
             tic = time.perf_counter()
             test_acc, test_mean_loss = trainer.test_model(test_loader,
                                                           iteration=epoch,

@@ -150,7 +150,7 @@ class ResNet(nn.Module):
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
                                        dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.dropout = nn.Dropout(p=0.5)
+        self.dropout = nn.Dropout(p=0.7)
         self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
@@ -215,6 +215,18 @@ class ResNet(nn.Module):
 
     def forward(self, x, target=None):
         return self._forward_impl(x)
+
+    def freeze_layers(self):
+        for param in self.model.parameters():
+            param.requires_grad = False
+        self.fc.requires_grad_()
+
+    def unfreeze_layers(self):
+        frozen_parameters = filter(lambda p: p.requires_grad==False, self.model.parameters())
+        for param in frozen_parameters:
+            param.requires_grad = True
+        return frozen_parameters
+
 
 class ResNet_wide(nn.Module):
 
