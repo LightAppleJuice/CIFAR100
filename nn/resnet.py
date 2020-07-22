@@ -217,12 +217,12 @@ class ResNet(nn.Module):
         return self._forward_impl(x)
 
     def freeze_layers(self):
-        for param in self.model.parameters():
+        for param in self.parameters():
             param.requires_grad = False
         self.fc.requires_grad_()
 
     def unfreeze_layers(self):
-        frozen_parameters = filter(lambda p: p.requires_grad==False, self.model.parameters())
+        frozen_parameters = filter(lambda p: p.requires_grad==False, self.parameters())
         for param in frozen_parameters:
             param.requires_grad = True
         return frozen_parameters

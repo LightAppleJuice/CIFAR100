@@ -226,8 +226,8 @@ if __name__ == '__main__':
 
         tic = time.perf_counter()
         for epoch in range(params.num_epoch):
-            if epoch == 20:
-                parameters = trainer.model.unfreeze()
+            if epoch == 0:
+                parameters = trainer.model.unfreeze_layers()
                 optimizer.add_param_group({'params': parameters})
 
             tic = time.perf_counter()
