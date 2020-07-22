@@ -51,7 +51,10 @@ def lr_range_test():
 if __name__ == '__main__':
     root_path = './data'
     out_dir = './results'
-    config_name = './configs/cnn_mfm.json'
+    # config_name = './configs/cnn_mfm.json'
+    # config_name = './configs/resnet_wide.json'
+    config_name = './configs/resnet18.json'
+    config_name = './configs/resnet18_pretrained.json'
     # config_name = './configs/cnn_mfm_norm_embds.json'
 
     run_lr_range_test = False
@@ -66,7 +69,7 @@ if __name__ == '__main__':
     now = datetime.datetime.now()
     print(now.strftime("%Y-%m-%d %H:%M:%S"))
 
-    experiment_name = os.path.basename(config_name).split('.')[0] + '_last'
+    experiment_name = os.path.basename(config_name).split('.')[0] + ''
     out_dir = '_'.join([os.path.join(out_dir, experiment_name), now.strftime("%m_%d_%H")])
     print('Find log in {}'.format(out_dir))
 
@@ -144,8 +147,10 @@ if __name__ == '__main__':
         model = CNN(n_filters=params['model_params'], n_classes=100, norm_embds=params.norm_embds)
     elif params.model == "CNN_mfm_lsoftmax":
         model = MarginSoftmaxCNN(n_filters=params['model_params'], n_classes=100, margin=params.margin)
-    elif params.model == "ResNet":
+    elif params.model == "ResNet18":
         model = ResNet(BasicBlock, params.model_params, num_classes=100)
+    elif params.model == "ResNet_wide":
+        model = ResNet_wide(BasicBlock, params.model_params, num_classes=100, k=params.width)
     else:
         raise Exception('Unknown architecture. Use one of CNN, CNN_mfm, ResNet')
 
@@ -181,6 +186,8 @@ if __name__ == '__main__':
     if run_training:
         if params.use_pretrained and os.path.exists(params.use_pretrained):
             model_utils.load_model(model, params.use_pretrained)
+        elif params.use_pretrained and params.use_pretrained == "url":
+            model = torch.hub.load('pytorch/vision:v0.6.0', 'resnet18', pretrained=True)
         else:
             logger.info('No pretrained model was found.')
 
