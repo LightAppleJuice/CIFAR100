@@ -3,8 +3,7 @@
     "batch_size_train": 128,
     "batch_size_test": 128,
     "cuda_number": 0,
-    "learning_rate": 0.01,
-//    "learning_rate_step": 3,
+
     "num_epoch": 300,
     "use_pretrained": "url",
     "model_params": [2, 2, 2, 2],
@@ -13,10 +12,9 @@
     "loss": "CrossEntropyLoss",
     "model": "ResNet18",
 
-    "lr_scheduler": "OneCycleLR",
-    "max_lr" : 5e-2,
-    "div_factor": 10,
-    "final_div_factor": 100,
+    "lr_scheduler": "StepLR",
+    "learning_rate": 0.001,
+    "learning_rate_step": 50,
     "do_mixup": false
   }
 }

@@ -31,6 +31,18 @@ def load_model(model, model_path):
     :return:
     '''
     loaded_state_dict = torch.load(model_path, map_location='cpu')
+    load_state_dict(model, loaded_state_dict)
+
+
+def load_state_dict(model, loaded_state_dict):
+    '''
+    Accurate model loading function: if model was saved DataParallel mode
+    it removes 'module' terms from state_dict
+    :param model:
+    :param loaded_state_dict:
+    :return:
+    '''
+
     model_state_dict = model.state_dict()
 
     new_state_dict = OrderedDict()
