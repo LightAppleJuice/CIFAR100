@@ -147,7 +147,7 @@ class CifarTrainer:
                 if self.scheduler:
                     self.scheduler.step()
 
-    def test_model(self, test_loader, iteration, epoch, batch_idx, save_model=True, mark=''):
+    def test_model(self, test_loader, iteration, epoch, batch_idx, save_model=False, mark=''):
         """
         Evaluate model
         :param test_loader:
