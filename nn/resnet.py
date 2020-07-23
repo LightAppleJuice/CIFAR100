@@ -137,7 +137,7 @@ class ResNet(nn.Module):
                              "or a 3-element tuple, got {}".format(replace_stride_with_dilation))
         self.groups = groups
         self.base_width = width_per_group
-        self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=3, stride=2, padding=3,
+        self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
@@ -150,7 +150,7 @@ class ResNet(nn.Module):
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
                                        dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.dropout = nn.Dropout(p=0.7)
+        # self.dropout = nn.Dropout(p=0.7)
         self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
@@ -208,7 +208,6 @@ class ResNet(nn.Module):
 
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
-        x = self.dropout(x)
         x = self.fc(x)
 
         return x
@@ -216,24 +215,24 @@ class ResNet(nn.Module):
     def forward(self, x, target=None):
         return self._forward_impl(x)
 
-    def freeze_layers(self):
-        for param in self.parameters():
-            param.requires_grad = False
-        self.fc.requires_grad_()
+    # def freeze_layers(self):
+    #     for param in self.parameters():
+    #         param.requires_grad = False
+    #     self.fc.requires_grad_()
+    #
+    # def unfreeze_layers(self):
+    #     frozen_parameters = filter(lambda p: p.requires_grad == False, self.parameters())
+    #     for param in frozen_parameters:
+    #         param.requires_grad = True
+    #     return frozen_parameters
 
-    def unfreeze_layers(self):
-        frozen_parameters = filter(lambda p: p.requires_grad==False, self.parameters())
-        for param in frozen_parameters:
-            param.requires_grad = True
-        return frozen_parameters
 
-
-class ResNet_wide(nn.Module):
+class WideResNet(nn.Module):
 
     def __init__(self, block, layers, num_classes=1000, zero_init_residual=False,
                  groups=1, width_per_group=64, replace_stride_with_dilation=None,
                  norm_layer=None, k=1):
-        super(ResNet_wide, self).__init__()
+        super(WideResNet, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
@@ -249,11 +248,10 @@ class ResNet_wide(nn.Module):
                              "or a 3-element tuple, got {}".format(replace_stride_with_dilation))
         self.groups = groups
         self.base_width = width_per_group
-        self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=3, stride=2, padding=1,
-                               bias=False)
+        self.conv1 = conv3x3(3, self.inplanes)
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        # self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 16*k, layers[0])
         self.layer2 = self._make_layer(block, 32*k, layers[1], stride=2,
                                        dilate=replace_stride_with_dilation[0])

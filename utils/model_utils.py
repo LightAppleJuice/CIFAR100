@@ -54,3 +54,18 @@ def load_state_dict(model, loaded_state_dict):
         new_state_dict[name] = v
 
     model.load_state_dict(new_state_dict,  strict=False)
+
+
+def freeze_layers(model, layer_type):
+    for m in model.modules():
+        if not isinstance(m, layer_type):
+            m.requires_grad_(requires_grad=False)
+        else:
+            m.requires_grad_()
+
+
+def unfreeze_layers(model):
+    frozen_parameters = filter(lambda p: p.requires_grad == False, model.parameters())
+    for param in frozen_parameters:
+        param.requires_grad = True
+    return frozen_parameters
