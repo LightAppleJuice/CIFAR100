@@ -6,7 +6,7 @@ from nn.lsoftmax import LSoftmaxLinear
 
 
 class MarginSoftmaxCNN(nn.Module):
-    def __init__(self, n_filters, n_classes=1, input_shape=[32, 32], mfm=True, softmax='lsoftmax', margin=2):
+    def __init__(self, n_filters, n_classes=1, input_shape=[32, 32], mfm=True, margin=2):
         """
         Simple CNN model used for CIFAR100 with margin softmax
         Architecture uses VGG blocks with smaller filter numbers
@@ -44,9 +44,8 @@ class MarginSoftmaxCNN(nn.Module):
                 nn.ReLU(True))
             self.dropout = nn.Dropout(p=0.5)
 
-        if softmax == 'lsoftmax':
-            self.classifier = LSoftmaxLinear(
-                input_features=n_classes * 2, output_features=n_classes, margin=margin)
+        self.classifier = LSoftmaxLinear(
+            input_features=n_classes * 2, output_features=n_classes, margin=margin)
 
         self.initialize_weights()
 

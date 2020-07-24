@@ -1,19 +1,19 @@
 {
   "train_params": {
-    "batch_size_train": 128,
-    "batch_size_test": 128,
+    "batch_size_train": 64,
+    "batch_size_test": 64,
     "cuda_number": 0,
 
-    "num_epoch": 300,
+    "num_epoch": 100,
     "use_pretrained": "url",
     "model_params": [2, 2, 2, 2],
     "optimizer": "SGD",
     "num_workers": 16,
     "loss": "CrossEntropyLoss",
-    "model": "ResNet18",
+    "model": "origResNet18",
 
     "lr_scheduler": "StepLR",
-    "learning_rate": 0.001,
+    "learning_rate": 0.01,
     "learning_rate_step": 50,
     "do_mixup": false
   }

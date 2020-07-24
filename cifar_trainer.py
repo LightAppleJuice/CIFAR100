@@ -2,7 +2,9 @@ import torch
 import os
 import logging
 from torch.utils.tensorboard import SummaryWriter
+
 from utils import data_utils
+from nn.lsoftmax import LSoftmaxLinear
 
 logger = logging.getLogger("CIFAR.Trainer")
 
@@ -70,9 +72,10 @@ class CifarTrainer:
             images_batch = images_batch.to(self.device).float()
             labels_batch = labels_batch.to(self.device)
 
-            # output = self.model(images_batch)
-            # for lsoftmax
-            output = self.model(images_batch, labels_batch)
+            if isinstance(self.model.classifier, LSoftmaxLinear):
+                output = self.model(images_batch, labels_batch)
+            else:
+                output = self.model(images_batch)
             loss = self.criterion(output, labels_batch)
 
             if batch_idx % 10 == 0:

@@ -20,6 +20,7 @@ from utils import config_parser, model_utils
 from nn.cnn import *
 from nn.cnn_margin_softmax import *
 from nn.resnet import *
+from nn.wide_resnet import *
 from nn import losses
 from utils.lr_range_tester import LRFinder
 from six.moves import urllib
@@ -60,7 +61,8 @@ if __name__ == '__main__':
     root_path = './data'
     out_dir = './results'
     # config_name = './configs/cnn_mfm.json'
-    config_name = './configs/resnet_wide.json'
+    # config_name = './configs/resnet_wide.json'
+    config_name = './configs/resnet_wide_lsoftmax.json'
     # config_name = './configs/resnet18.json'
     # config_name = './configs/resnet18_pretrained.json'
     # config_name = './configs/cnn_mfm_norm_embds.json'
@@ -77,7 +79,7 @@ if __name__ == '__main__':
     now = datetime.datetime.now()
     print(now.strftime("%Y-%m-%d %H:%M:%S"))
 
-    experiment_name = os.path.basename(config_name).split('.')[0] + '_64'
+    experiment_name = os.path.basename(config_name).split('.')[0] + '_beta0'
     out_dir = '_'.join([os.path.join(out_dir, experiment_name), now.strftime("%m_%d_%H")])
     print('Find log in {}'.format(out_dir))
 
@@ -158,10 +160,14 @@ if __name__ == '__main__':
         model = CNN(n_filters=params['model_params'], n_classes=100, norm_embds=params.norm_embds)
     elif params.model == "CNN_mfm_lsoftmax":
         model = MarginSoftmaxCNN(n_filters=params['model_params'], n_classes=100, margin=params.margin)
+    elif params.model == "origResNet18":
+        model = torchvision.models.resnet18(num_classes=100)
     elif params.model == "ResNet18":
         model = ResNet(BasicBlock, params.model_params, num_classes=100)
     elif params.model == "WideResNet":
-        model = WideResNet(BasicBlock, params.model_params, num_classes=100, k=params.width)
+        model = WideResNet(WideBasicBlock, params.model_params, num_classes=100, k=params.width)
+    elif params.model == "WideResNet_lsoftmax":
+        model = WideResNet(WideBasicBlock, params.model_params, num_classes=100, k=params.width, margin=params.margin)
     else:
         raise Exception('Unknown architecture. Use one of CNN, CNN_mfm, ResNet')
 
@@ -169,17 +175,17 @@ if __name__ == '__main__':
         unfreeze_in = None
         if params.use_pretrained and os.path.exists(params.use_pretrained):
             model_utils.load_model(model, params.use_pretrained)
-        elif params.use_pretrained and params.use_pretrained == "url":
-            model = torchvision.models.resnet18(pretrained=True)
+        elif params.model == "origResNet18" and params.use_pretrained == "url":
+            resnet18 = torchvision.models.resnet18(pretrained=True)
+            model_utils.load_state_dict(model, resnet18.state_dict())
             model_utils.freeze_layers(model, nn.Linear)
-            # model_utils.load_state_dict(model, resnet18.state_dict())
-            unfreeze_in = 15
+            unfreeze_in = 5
         else:
             logger.info('No pretrained model was found.')
 
-
     model.eval()
     model.to(device)
+    # summary(model, input_size=(3, 224, 224))
     summary(model, input_size=(3, 32, 32))
 
     # filter(lambda p: p.requires_grad, model.parameters())
@@ -216,7 +222,8 @@ if __name__ == '__main__':
         if params.lr_scheduler == 'StepLR':
             scheduler = lr_scheduler.StepLR(optimizer, step_size=params.learning_rate_step, gamma=0.1)
         elif params.lr_scheduler == 'MultiStepLR':
-            scheduler = lr_scheduler.MultiStepLR(optimizer, [50, 100], gamma=0.1)
+            # scheduler = lr_scheduler.MultiStepLR(optimizer, [50, 100], gamma=0.1)
+            scheduler = lr_scheduler.MultiStepLR(optimizer, [40, 80], gamma=0.1)
         elif params.lr_scheduler == 'ReduceLROnPlateau':
             scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=20, verbose=True,
                                                        threshold=0.0001, min_lr=0, eps=1e-04)
