@@ -72,7 +72,7 @@ class CifarTrainer:
             images_batch = images_batch.to(self.device).float()
             labels_batch = labels_batch.to(self.device)
 
-            if isinstance(self.model.classifier, LSoftmaxLinear):
+            if isinstance(self.model.classifier, LSoftmaxLinear) or isinstance(self.model.fc, LSoftmaxLinear):
                 output = self.model(images_batch, labels_batch)
             else:
                 output = self.model(images_batch)

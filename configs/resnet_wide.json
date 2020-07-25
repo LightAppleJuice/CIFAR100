@@ -12,7 +12,8 @@
     "loss": "CrossEntropyLoss",
 //    "loss": "SoftCrossEntropyLoss",
     "model": "WideResNet",
-    "width": 1,
+    "width": 4
+    "margin": 0,
 
     "lr_scheduler": "OneCycleLR",
     "max_lr" : 1e-2,

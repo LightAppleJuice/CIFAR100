@@ -4,7 +4,7 @@
     "batch_size_test": 64,
     "cuda_number": 0,
 
-    "num_epoch": 100,
+    "num_epoch": 120,
     "use_pretrained": "url",
     "model_params": [2, 2, 2, 2],
     "optimizer": "SGD",
