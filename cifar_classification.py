@@ -79,7 +79,7 @@ if __name__ == '__main__':
     now = datetime.datetime.now()
     print(now.strftime("%Y-%m-%d %H:%M:%S"))
 
-    experiment_name = os.path.basename(config_name).split('.')[0] + '_beta0'
+    experiment_name = os.path.basename(config_name).split('.')[0] + ''
     out_dir = '_'.join([os.path.join(out_dir, experiment_name), now.strftime("%m_%d_%H")])
     print('Find log in {}'.format(out_dir))
 
@@ -246,7 +246,8 @@ if __name__ == '__main__':
                                result_dir=out_dir,
                                device=device,
                                scheduler=scheduler,
-                               change_lr_during_epoch=change_lr_during_epoch)
+                               change_lr_during_epoch=change_lr_during_epoch,
+                               lsoftmax=True if 'lsoftmax' in params.model else False)
 
         tic = time.perf_counter()
         for epoch in range(params.num_epoch):
