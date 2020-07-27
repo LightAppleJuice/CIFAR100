@@ -49,9 +49,13 @@ def load_state_dict(model, loaded_state_dict):
     for k, v in loaded_state_dict.items():
         # if DataParallel was used
         name = k.replace("module.", "")
-        if v.shape != model_state_dict[name].shape:
-            continue
-        new_state_dict[name] = v
+        if name in model_state_dict:
+            if v.shape != model_state_dict[name].shape:
+                continue
+            new_state_dict[name] = v
+        else:
+            print('{} was skipped'.format(name))
+
 
     model.load_state_dict(new_state_dict,  strict=False)
 

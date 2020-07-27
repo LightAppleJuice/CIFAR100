@@ -8,11 +8,11 @@
     "use_pretrained": false,
     "model_params": [3, 3, 3],
     "optimizer": "SGD",
-    "num_workers": 16,
+    "num_workers": 6,
     "loss": "CrossEntropyLoss",
 //    "loss": "SoftCrossEntropyLoss",
     "model": "WideResNet",
-    "width": 4
+    "width": 6,
     "margin": 0,
 
     "lr_scheduler": "OneCycleLR",

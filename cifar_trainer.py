@@ -14,7 +14,7 @@ class CifarTrainer:
     Basic Tainer for cifar 100 task
     """
     def __init__(self,  model, criterion, optimizer, device, snapshot_dir, log_dir, result_dir, scheduler,
-                 change_lr_during_epoch, lsoftmax=False):
+                 change_lr_during_epoch, use_labels_for_training=False):
         """
 
         :param model:
@@ -34,7 +34,7 @@ class CifarTrainer:
         self.device = device
         self.scheduler = scheduler
         self.change_lr_during_epoch = change_lr_during_epoch
-        self.use_labels_for_training = lsoftmax
+        self.use_labels_for_training = use_labels_for_training
 
         # TensorBoard visualization: needs command tensorboard --logdir path_to_log_dir
         self.writer = SummaryWriter(os.path.join(log_dir, 'tensorboard_dir'))
@@ -131,7 +131,10 @@ class CifarTrainer:
             labels_a = labels_a.to(self.device)
             labels_b = labels_b.to(self.device)
 
-            output = self.model(images_batch)
+            if self.use_labels_for_training:
+                output = self.model(images_batch, labels_batch)
+            else:
+                output = self.model(images_batch)
 
             loss = lam * self.criterion(output, labels_a) + (1 - lam) * self.criterion(output, labels_b)
 

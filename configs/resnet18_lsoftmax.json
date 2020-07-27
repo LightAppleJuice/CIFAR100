@@ -3,20 +3,20 @@
     "batch_size_train": 64,
     "batch_size_test": 64,
     "cuda_number": 0,
+    "learning_rate": 0.01,
     "num_epoch": 200,
-    "use_pretrained": "snapshots/cnn_mfm.pth",
-    "model_params": [16, 32, 64],
+    "use_pretrained": "url",
+    "model_params": [2, 2, 2, 2],
     "optimizer": "SGD",
     "num_workers": 16,
-    "model": "CNN_mfm_lsoftmax",
-    "norm_embds": false,
-    "margin": 4,
     "loss": "CrossEntropyLoss",
+    "model": "ResNet18_lsoftmax",
+    "margin": 1,
+
     "lr_scheduler": "OneCycleLR",
-    "div_factor": 1,
     "max_lr" : 1e-2,
+    "div_factor": 10,
     "final_div_factor": 1000,
-    "learning_rate": 0.01,
     "do_mixup": false
   }
 }

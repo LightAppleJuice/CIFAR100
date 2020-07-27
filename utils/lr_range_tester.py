@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 
 from packaging import version
+import logging
+logger = logging.getLogger("CIFAR.lr_range_test")
 
 PYTORCH_VERSION = version.parse(torch.__version__)
 
@@ -287,6 +289,7 @@ class LRFinder(object):
                 accumulation_steps,
                 non_blocking_transfer=non_blocking_transfer,
             )
+            logger.info('train {}'.format(loss))
             loss_val = None
 
             if val_loader:
@@ -308,6 +311,7 @@ class LRFinder(object):
                 loss_val = self._validate_upd(
                     val_iter_upd, non_blocking_transfer=non_blocking_transfer, accumulation_steps=10
                 )
+                logger.info('val {}'.format(loss_val))
 
             # Update the learning rate
             self.history["lr"].append(lr_schedule.get_lr()[0])
@@ -361,7 +365,7 @@ class LRFinder(object):
             )
 
             # Forward pass
-            outputs = self.model(inputs, target=labels)
+            outputs = self.model(inputs)#, target=labels)
             loss = self.criterion(outputs, labels)
 
             # Loss should be averaged in each step

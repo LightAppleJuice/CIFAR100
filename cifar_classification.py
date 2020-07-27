@@ -21,19 +21,18 @@ from nn.cnn import *
 from nn.cnn_margin_softmax import *
 from nn.resnet import *
 from nn.wide_resnet import *
-from nn import losses
+from nn.amsoftmax import *
+from nn import label_smoothing
 from utils.lr_range_tester import LRFinder
 from six.moves import urllib
 
 from cifar_custom_dataset import CIFAR100
 
-proxy = urllib.request.ProxyHandler({'http': 'proxy.stc:3128', 'https': 'proxy.stc:3128'})
-# construct a new opener using your proxy settings
-opener = urllib.request.build_opener(proxy)
-# install the openen on the module-level
-urllib.request.install_opener(opener)
+import logging
 
-def lr_range_test():
+
+def lr_range_test(model, optimizer, loss_function, train_loader, test_loader, out_dir):
+    logger = logging.getLogger("CIFAR")
     logger.info('LR_learning test')
 
     lr_finder = LRFinder(model, optimizer, loss_function)
@@ -43,8 +42,8 @@ def lr_range_test():
                          step_mode="exp", diverge_th=100)
     a = lr_finder.history['loss_train']
     arr = [len(a)]
-    arr.extend([i for i, d in enumerate(a) if d >= 7 or np.isnan(d)])
-    arr.extend([i for i, d in enumerate(lr_finder.history["loss_val"]) if d >= 7 or np.isnan(d)])
+    arr.extend([i for i, d in enumerate(a) if d >= 20 or np.isnan(d)])
+    arr.extend([i for i, d in enumerate(lr_finder.history["loss_val"]) if d >= 20 or np.isnan(d)])
     b = min(arr)
     fig, ax = plt.subplots()
     ax = lr_finder.plot(ax=ax, skip_start=0, skip_end=len(a)-b)
@@ -57,15 +56,9 @@ def lr_range_test():
     lr_finder.reset()
 
 
-if __name__ == '__main__':
+def run_experiment(config_name, experiment_id, train_transform, test_transform):
     root_path = './data'
     out_dir = './results'
-    # config_name = './configs/cnn_mfm.json'
-    # config_name = './configs/resnet_wide.json'
-    config_name = './configs/resnet_wide_lsoftmax.json'
-    # config_name = './configs/resnet18.json'
-    # config_name = './configs/resnet18_pretrained.json'
-    # config_name = './configs/cnn_mfm_norm_embds.json'
 
     run_lr_range_test = False
     run_training = True
@@ -79,7 +72,7 @@ if __name__ == '__main__':
     now = datetime.datetime.now()
     print(now.strftime("%Y-%m-%d %H:%M:%S"))
 
-    experiment_name = os.path.basename(config_name).split('.')[0] + ''
+    experiment_name = os.path.basename(config_name).split('.')[0] + experiment_id
     out_dir = '_'.join([os.path.join(out_dir, experiment_name), now.strftime("%m_%d_%H")])
     print('Find log in {}'.format(out_dir))
 
@@ -111,9 +104,6 @@ if __name__ == '__main__':
     # 1. Data preparation
     #######################################
 
-    cifar_mean = torch.tensor([0.5071, 0.4866, 0.4409])
-    cifar_std = torch.tensor([0.2673, 0.2564, 0.2761])
-
     # train_data = CIFAR100(root_path, train=True, download=False,
     #                       custom_aug=A.Compose({A.FancyPCA()}),
     #                       transform=torchvision.transforms.Compose([
@@ -122,24 +112,9 @@ if __name__ == '__main__':
     #                       ])
     #                       )
 
-    train_data = torchvision.datasets.CIFAR100(root_path, train=True, download=True,
-                                               transform=torchvision.transforms.Compose([
-                                                   torchvision.transforms.RandomCrop(32, padding=4),
-                                                   torchvision.transforms.RandomHorizontalFlip(),
-                                                   # torchvision.transforms.ColorJitter()
-                                                   torchvision.transforms.RandomRotation(10),
-                                                   # torchvision.transforms.Resize([224, 224]), # for Imagenet pretrained
-                                                   torchvision.transforms.ToTensor(),
-                                                   torchvision.transforms.Normalize(mean=cifar_mean, std=cifar_std)
+    train_data = torchvision.datasets.CIFAR100(root_path, train=True, download=True, transform=train_transform)
 
-                                               ]))
-
-    test_data = torchvision.datasets.CIFAR100(root_path, train=False, download=False,
-                                              transform=torchvision.transforms.Compose([
-                                                  # torchvision.transforms.Resize([224, 224]), # for Imagenet pretrained
-                                                  torchvision.transforms.ToTensor(),
-                                                  torchvision.transforms.Normalize(mean=cifar_mean, std=cifar_std),
-                                              ]))
+    test_data = torchvision.datasets.CIFAR100(root_path, train=False, download=False, transform=test_transform)
 
     train_loader = DataLoader(train_data, batch_size=params.batch_size_train, shuffle=True,
                               num_workers=params.num_workers)
@@ -164,6 +139,10 @@ if __name__ == '__main__':
         model = torchvision.models.resnet18(num_classes=100)
     elif params.model == "ResNet18":
         model = ResNet(BasicBlock, params.model_params, num_classes=100)
+    elif params.model == "ResNet18_lsoftmax":
+        model = ResNet(BasicBlock, params.model_params, num_classes=100, margin=params.margin, loss_type='l')
+    elif params.model == "ResNet18_amsoftmax":
+        model = ResNet(BasicBlock, params.model_params, num_classes=100, margin=params.margin, loss_type='am')
     elif params.model == "WideResNet":
         model = WideResNet(WideBasicBlock, params.model_params, num_classes=100, k=params.width)
     elif params.model == "WideResNet_lsoftmax":
@@ -175,20 +154,25 @@ if __name__ == '__main__':
         unfreeze_in = None
         if params.use_pretrained and os.path.exists(params.use_pretrained):
             model_utils.load_model(model, params.use_pretrained)
-        elif params.model == "origResNet18" and params.use_pretrained == "url":
-            resnet18 = torchvision.models.resnet18(pretrained=True)
-            model_utils.load_state_dict(model, resnet18.state_dict())
+        elif params.model == "origResNet18" and params.use_pretrained == "orig18":
+            model = torchvision.models.resnet18(pretrained=True)
+            model.fc = nn.Linear(512, 100)
             model_utils.freeze_layers(model, nn.Linear)
-            unfreeze_in = 5
+            unfreeze_in = params.freeze
+        elif params.model == "origResNet18" and params.use_pretrained == "orig34":
+            model = torchvision.models.resnet18(pretrained=True)
+            init_model = torchvision.models.resnet34(pretrained=True)
+            model_utils.load_state_dict(model, init_model.state_dict())
+            model.fc = nn.Linear(512, 100)
+            model_utils.freeze_layers(model, nn.Linear)
+            unfreeze_in = params.freeze
         else:
             logger.info('No pretrained model was found.')
 
     model.eval()
     model.to(device)
-    # summary(model, input_size=(3, 224, 224))
     summary(model, input_size=(3, 32, 32))
 
-    # filter(lambda p: p.requires_grad, model.parameters())
     if params.optimizer == 'Adam':
         optimizer = optim.Adam(model.parameters(), lr=params.learning_rate, weight_decay=5e-4)
     elif params.optimizer == 'SGD':
@@ -205,7 +189,7 @@ if __name__ == '__main__':
     elif params.loss == 'NLLLoss':
         loss_function = nn.NLLLoss()
     elif params.loss == 'SoftCrossEntropyLoss':
-        loss_function = losses.SoftCrossEntropyLoss(label_smoothing=0.1, num_classes=100)
+        loss_function = label_smoothing.SoftCrossEntropyLoss(label_smoothing=0.1, num_classes=100)
     else:
         raise Exception('Unknown type of loss')
 
@@ -213,7 +197,8 @@ if __name__ == '__main__':
     # 3. LR range test
     #######################################
     if run_lr_range_test:
-        lr_range_test()
+        lr_range_test(model=model, loss_function=loss_function, optimizer=optimizer,
+                      out_dir=out_dir, train_loader=train_loader, test_loader=test_loader)
     #######################################
     # 4. Training
     #######################################
@@ -223,7 +208,8 @@ if __name__ == '__main__':
             scheduler = lr_scheduler.StepLR(optimizer, step_size=params.learning_rate_step, gamma=0.1)
         elif params.lr_scheduler == 'MultiStepLR':
             # scheduler = lr_scheduler.MultiStepLR(optimizer, [50, 100], gamma=0.1)
-            scheduler = lr_scheduler.MultiStepLR(optimizer, [40, 80], gamma=0.1)
+            # scheduler = lr_scheduler.MultiStepLR(optimizer, [40, 80], gamma=0.1)
+            scheduler = lr_scheduler.MultiStepLR(optimizer, [30, 60, 80], gamma=0.1)
         elif params.lr_scheduler == 'ReduceLROnPlateau':
             scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=20, verbose=True,
                                                        threshold=0.0001, min_lr=0, eps=1e-04)
@@ -247,15 +233,14 @@ if __name__ == '__main__':
                                device=device,
                                scheduler=scheduler,
                                change_lr_during_epoch=change_lr_during_epoch,
-                               lsoftmax=True if 'lsoftmax' in params.model else False)
+                               use_labels_for_training=True if 'lsoftmax' in params.model or
+                                                               'amsoftmax' in params.model else False)
 
         tic = time.perf_counter()
         for epoch in range(params.num_epoch):
             if epoch == unfreeze_in:
                 model_utils.unfreeze_layers(model)
-                # optimizer.add_param_group({'params': parameters})
 
-            tic = time.perf_counter()
             test_acc, test_mean_loss = trainer.test_model(test_loader,
                                                           iteration=epoch,
                                                           epoch=epoch, batch_idx=0,
@@ -266,6 +251,7 @@ if __name__ == '__main__':
                                                             epoch=epoch, batch_idx=0,
                                                             mark='Train')
             logger.info('Training epoch {}/{}, lr: {}'.format(epoch, params.num_epoch, scheduler.get_lr()))
+            print('Check outpu in {}'.format(out_dir))
 
             if params.do_mixup:
                 trainer.train_mixup_epoch(train_loader, test_loader, epoch,
@@ -275,8 +261,60 @@ if __name__ == '__main__':
                                     train_acc_check=None, test_acc_check=None)
             if not change_lr_during_epoch:
                 scheduler.step()
-            toc = time.perf_counter()
-            logger.info(f"Finished in {(toc - tic) / ((epoch+1) * 60):0.4f} minutes")
+        toc = time.perf_counter()
+        logger.info(f"Finished in {(toc - tic) / ((epoch+1) * 60):0.4f} minutes")
+
+
+if __name__ == '__main__':
+    cifar_mean = torch.tensor([0.5071, 0.4866, 0.4409])
+    cifar_std = torch.tensor([0.2673, 0.2564, 0.2761])
+
+    train_transform = torchvision.transforms.Compose([
+        torchvision.transforms.RandomCrop(32, padding=4),
+        torchvision.transforms.RandomHorizontalFlip(),
+        # torchvision.transforms.ColorJitter()
+        torchvision.transforms.RandomRotation(10),
+        # torchvision.transforms.Resize([224, 224]),  # for Imagenet pretrained
+        torchvision.transforms.ToTensor(),
+        torchvision.transforms.Normalize(mean=cifar_mean, std=cifar_std)
+    ])
+
+    test_transform = torchvision.transforms.Compose([
+        # torchvision.transforms.Resize([224, 224]),  # for Imagenet pretrained
+        torchvision.transforms.ToTensor(),
+        torchvision.transforms.Normalize(mean=cifar_mean, std=cifar_std),
+    ])
+
+    # config_name = './configs/cnn_mfm.json'
+    # config_name = './configs/resnet_wide.json'
+    # config_name = './configs/resnet_wide_lsoftmax.json'
+    # config_name = './configs/resnet18.json'
+    # config_name = './configs/resnet18_lsoftmax.json'
+    config_name = './configs/resnet18_small_batch.json'
+    # config_name = './configs/cnn_mfm_norm_embds.json'
+    run_experiment(config_name, '', train_transform=train_transform, test_transform=test_transform)
+
+    # For pretrained models with data resized
+    # train_transform = torchvision.transforms.Compose([
+    #     torchvision.transforms.RandomCrop(32, padding=4),
+    #     torchvision.transforms.RandomHorizontalFlip(),
+    #     # torchvision.transforms.ColorJitter(),
+    #     torchvision.transforms.RandomRotation(10),
+    #     torchvision.transforms.Resize([224, 224]),  # for Imagenet pretrained
+    #     torchvision.transforms.ToTensor(),
+    #     torchvision.transforms.Normalize(mean=cifar_mean, std=cifar_std)
+    # ])
+    #
+    # test_transform = torchvision.transforms.Compose([
+    #     torchvision.transforms.Resize([224, 224]),  # for Imagenet pretrained
+    #     torchvision.transforms.ToTensor(),
+    #     torchvision.transforms.Normalize(mean=cifar_mean, std=cifar_std),
+    # ])
+    # config_name = './configs/resnet18_pretrained.json'
+    # run_experiment(config_name, '_no_freeze', train_transform=train_transform, test_transform=test_transform)
+
+
+
 
 
 

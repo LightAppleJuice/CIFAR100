@@ -1,7 +1,7 @@
 {
   "train_params": {
-    "batch_size_train": 64,
-    "batch_size_test": 64,
+    "batch_size_train": 16,
+    "batch_size_test": 16,
     "cuda_number": 0,
     "learning_rate": 0.01,
 //    "learning_rate_step": 3,
@@ -14,9 +14,9 @@
     "model": "ResNet18",
 
     "lr_scheduler": "OneCycleLR",
-    "max_lr" : 1e-2,
+    "max_lr" : 2e-4,
     "div_factor": 10,
-    "final_div_factor": 10000,
+    "final_div_factor": 100,
     "do_mixup": true
   }
 }

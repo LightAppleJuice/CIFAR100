@@ -19,8 +19,10 @@ class LSoftmaxLinear(nn.Module):
         self.output_dim = output_features  # number of output = class numbers
         self.margin = margin  # m
         # if Lsoftmax has difficulty converging
+        # self.beta_max = 300.0
+        # self.beta_min = 6.0 for cnn
+        self.beta_min = 2.0
         self.beta_max = 300.0
-        self.beta_min = 6.0
         self.it = 0
 
         # Initialize L-Softmax parameters
