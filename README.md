@@ -6,4 +6,4 @@ To run both options can be used:
  * notebook in Google Colab (https://colab.research.google.com/drive/1512z0Evkd7FCCUXX1BchJ0WPhYEmsmj2?usp=sharing)
 
 
-find the exteriment results in https://github.com/LightAppleJuice/CIFAR100/wiki/Experiments
+The exteriment results and discussions can be foud in in https://github.com/LightAppleJuice/CIFAR100/wiki/Experiments
